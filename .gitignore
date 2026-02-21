@@ -1,0 +1,15 @@
+# Системні папки Python
+__pycache__/
+*.py[cod]
+
+# Віртуальне оточення
+.venv/
+venv/
+
+# IDE
+.vs/
+.vscode/
+
+# Моделі та великі дані
+*.pth
+dataset/
