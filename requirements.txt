@@ -1,0 +1,11 @@
+torch
+torchvision
+timm
+pillow
+numpy
+tqdm
+flask
+flask-cors
+flask-session
+google-genai
+python-dotenv
