@@ -7,6 +7,7 @@ __pycache__/
 # Віртуальне оточення
 .venv/
 venv/
+!.env.example
 
 # Flask / runtime
 sessions/
@@ -22,7 +23,10 @@ archvision.db
 .vscode/
 .DS_Store
 Thumbs.db
+.idea/
 
 # Моделі та великі дані
 *.pth
 dataset/
+checkpoints/
+data/*.pth
