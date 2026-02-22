@@ -1,34 +1,51 @@
+from __future__ import annotations
+
+import logging
 import os
-from flask import Flask
-from flask_cors import CORS
-from flask_session import Session
+from pathlib import Path
 
-from database import init_db, create_test_users
-from routes import bp as main_bp
+from dotenv import load_dotenv
+from flask import Flask, jsonify
+
+from database import init_db
+from routes import bp
+from services.analysis_service import AnalysisService
 
 
-def create_app():
-    app = Flask(__name__, template_folder="templates", static_folder="static")
+def create_app() -> Flask:
+    base_dir = Path(__file__).resolve().parent
+    load_dotenv(base_dir / ".env")
 
-    app.config["SECRET_KEY"] = os.getenv("ARCHVISION_SECRET_KEY", "archvision-dev-secret")
-    app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB
+    app = Flask(
+        __name__,
+        template_folder=str(base_dir / "templates"),
+        static_folder=str(base_dir / "static"),
+    )
 
-    # Flask session
-    os.makedirs("sessions", exist_ok=True)
-    app.config["SESSION_TYPE"] = "filesystem"
-    app.config["SESSION_FILE_DIR"] = os.path.abspath("sessions")
-    app.config["SESSION_PERMANENT"] = False
-    app.config["SESSION_USE_SIGNER"] = True
+    # Basic config
+    app.config["BASE_DIR"] = base_dir
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
+    app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
+    app.config["CURRENT_ANALYSIS_MODE"] = "efficientnet_b0"
 
-    CORS(app)
-    Session(app)
+    # Logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
-    # Ініціалізація БД
-    init_db()
-    create_test_users()
+    # DB init
+    init_db(base_dir)
 
-    # Підключення роутів
-    app.register_blueprint(main_bp)
+    # Services
+    app.config["ANALYSIS_SERVICE"] = AnalysisService(base_dir)
+
+    # Routes
+    app.register_blueprint(bp)
+
+    @app.errorhandler(413)
+    def too_large(e):
+        return jsonify({"error": "File too large"}), 413
 
     return app
 
