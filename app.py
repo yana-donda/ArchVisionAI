@@ -3,7 +3,7 @@ from flask import Flask
 from flask_cors import CORS
 from flask_session import Session
 
-from database import init_db
+from database import init_db, create_test_users
 from routes import bp as main_bp
 
 
@@ -25,6 +25,7 @@ def create_app():
 
     # Ініціалізація БД
     init_db()
+    create_test_users()
 
     # Підключення роутів
     app.register_blueprint(main_bp)

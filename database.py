@@ -1,4 +1,9 @@
+import os
 import sqlite3
+import hashlib
+from functools import wraps
+
+from flask import session, jsonify
 
 DB_PATH = "archvision.db"
 
@@ -51,3 +56,100 @@ def init_db():
 
     conn.commit()
     conn.close()
+    
+# Auth helpers
+def hash_password(password: str, salt: bytes) -> bytes:
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100000)
+
+
+def verify_password(password: str, salt: bytes, stored_hash: bytes) -> bool:
+    return hash_password(password, salt) == stored_hash
+
+
+def create_user(username: str, password: str):
+    if not username or not password:
+        return False, "Username and password are required"
+
+    username = username.strip()
+
+    if len(username) < 3:
+        return False, "Username must be at least 3 characters"
+
+    if len(password) < 6:
+        return False, "Password must be at least 6 characters"
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+    if cursor.fetchone():
+        conn.close()
+        return False, "User already exists"
+
+    salt = os.urandom(32)
+    password_hash = hash_password(password, salt)
+
+    cursor.execute(
+        "INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?)",
+        (username, password_hash, salt)
+    )
+
+    conn.commit()
+    user_id = cursor.lastrowid
+    conn.close()
+
+    return True, {
+        "id": user_id,
+        "username": username
+    }
+
+
+def authenticate_user(username: str, password: str):
+    if not username or not password:
+        return None
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, username, password_hash, salt FROM users WHERE username = ?",
+        (username.strip(),)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    if not row["password_hash"] or not row["salt"]:
+        return None
+
+    if not verify_password(password, row["salt"], row["password_hash"]):
+        return None
+
+    return {
+        "id": row["id"],
+        "username": row["username"]
+    }
+
+
+def create_test_users():
+    """Тестовий користувач для швидкого входу"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM users WHERE username = ?", ("demo",))
+    exists = cursor.fetchone()
+    conn.close()
+
+    if not exists:
+        create_user("demo", "demo123")
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"error": "Authentication required"}), 401
+        return f(*args, **kwargs)
+    return decorated
