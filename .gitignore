@@ -1,14 +1,27 @@
 # Системні папки Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
 
 # Віртуальне оточення
 .venv/
 venv/
 
+# Flask / runtime
+sessions/
+archvision.db
+*.log
+
+# Env
+.env
+.env.*
+
 # IDE
 .vs/
 .vscode/
+.DS_Store
+Thumbs.db
 
 # Моделі та великі дані
 *.pth
