@@ -1,0 +1,241 @@
+{
+  "Achaemenid architecture": {
+    "regions": [
+      {"name": "Persepolis, Iran", "center": [29.9352, 52.8914], "radius_km": 200, "description": "Ancient Persian capital"}
+    ],
+    "buildings": [
+      {"name": "Persepolis", "coordinates": [29.9352, 52.8914], "description": "Ceremonial capital of Achaemenid Empire"},
+      {"name": "Pasargadae", "coordinates": [30.1936, 53.1678], "description": "Tomb of Cyrus the Great"}
+    ]
+  },
+  "American Foursquare architecture": {
+    "regions": [
+      {"name": "Chicago, USA", "center": [41.8781, -87.6298], "radius_km": 300, "description": "Midwest United States"}
+    ],
+    "buildings": [
+      {"name": "American Foursquare Houses", "coordinates": [41.8781, -87.6298], "description": "Typical early 20th century American homes"}
+    ]
+  },
+  "American craftsman style": {
+    "regions": [
+      {"name": "California, USA", "center": [34.0522, -118.2437], "radius_km": 400, "description": "West Coast United States"}
+    ],
+    "buildings": [
+      {"name": "Gamble House", "coordinates": [34.1722, -118.1145], "description": "Masterpiece of American Arts and Crafts"}
+    ]
+  },
+  "Ancient Egyptian architecture": {
+    "regions": [
+      {"name": "Giza, Egypt", "center": [29.9792, 31.1342], "radius_km": 500, "description": "Nile Valley, Egypt"}
+    ],
+    "buildings": [
+      {"name": "Great Pyramid of Giza", "coordinates": [29.9792, 31.1342], "description": "Oldest of the Seven Wonders"},
+      {"name": "Luxor Temple", "coordinates": [25.6997, 32.6390], "description": "Ancient Egyptian temple complex"},
+      {"name": "Karnak Temple", "coordinates": [25.7188, 32.6573], "description": "Largest ancient religious site"}
+    ]
+  },
+  "Art Deco architecture": {
+    "regions": [
+      {"name": "New York, USA", "center": [40.7484, -73.9857], "radius_km": 100, "description": "Manhattan skyscrapers"},
+      {"name": "Miami Beach, USA", "center": [25.7907, -80.1300], "radius_km": 50, "description": "Art Deco Historic District"}
+    ],
+    "buildings": [
+      {"name": "Chrysler Building", "coordinates": [40.7516, -73.9755], "description": "Iconic Art Deco skyscraper"},
+      {"name": "Empire State Building", "coordinates": [40.7484, -73.9857], "description": "Famous New York landmark"}
+    ]
+  },
+  "Art Nouveau architecture": {
+    "regions": [
+      {"name": "Brussels, Belgium", "center": [50.8503, 4.3517], "radius_km": 100, "description": "Birthplace of Art Nouveau"},
+      {"name": "Barcelona, Spain", "center": [41.3851, 2.1734], "radius_km": 50, "description": "Gaudi's masterpieces"}
+    ],
+    "buildings": [
+      {"name": "Casa Batllo", "coordinates": [41.3917, 2.1649], "description": "Gaudi's colorful masterpiece"},
+      {"name": "Horta Museum", "coordinates": [50.8225, 4.3557], "description": "Victor Horta's Art Nouveau home"}
+    ]
+  },
+  "Baroque architecture": {
+    "regions": [
+      {"name": "Rome, Italy", "center": [41.9028, 12.4964], "radius_km": 200, "description": "Heart of Baroque art"},
+      {"name": "Vienna, Austria", "center": [48.2082, 16.3738], "radius_km": 150, "description": "Austrian Baroque"}
+    ],
+    "buildings": [
+      {"name": "St. Peter's Basilica", "coordinates": [41.9022, 12.4539], "description": "World's largest church"},
+      {"name": "Palace of Versailles", "coordinates": [48.8049, 2.1204], "description": "French Baroque palace"}
+    ]
+  },
+  "Bauhaus architecture": {
+    "regions": [
+      {"name": "Dessau, Germany", "center": [51.8387, 12.2428], "radius_km": 100, "description": "Bauhaus school location"},
+      {"name": "Tel Aviv, Israel", "center": [32.0853, 34.7818], "radius_km": 50, "description": "White City - UNESCO site"}
+    ],
+    "buildings": [
+      {"name": "Bauhaus Building", "coordinates": [51.8387, 12.2428], "description": "Original Bauhaus school"},
+      {"name": "Tel Aviv White City", "coordinates": [32.0853, 34.7818], "description": "Largest Bauhaus collection"}
+    ]
+  },
+  "Beaux-Arts architecture": {
+    "regions": [
+      {"name": "Paris, France", "center": [48.8566, 2.3522], "radius_km": 100, "description": "French academic architecture"}
+    ],
+    "buildings": [
+      {"name": "Grand Palais", "coordinates": [48.8662, 2.3125], "description": "Parisian exhibition hall"},
+      {"name": "New York Public Library", "coordinates": [40.7532, -73.9822], "description": "Beaux-Arts masterpiece"}
+    ]
+  },
+  "Byzantine architecture": {
+    "regions": [
+      {"name": "Istanbul, Turkey", "center": [41.0082, 28.9784], "radius_km": 200, "description": "Former Constantinople"},
+      {"name": "Ravenna, Italy", "center": [44.4184, 12.2035], "radius_km": 50, "description": "Byzantine mosaics"}
+    ],
+    "buildings": [
+      {"name": "Hagia Sophia", "coordinates": [41.0086, 28.9802], "description": "Iconic Byzantine cathedral"},
+      {"name": "Basilica of San Vitale", "coordinates": [44.4206, 12.1968], "description": "Famous Byzantine mosaics"}
+    ]
+  },
+  "Chicago school architecture": {
+    "regions": [
+      {"name": "Chicago, USA", "center": [41.8781, -87.6298], "radius_km": 50, "description": "Birthplace of skyscrapers"}
+    ],
+    "buildings": [
+      {"name": "Auditorium Building", "coordinates": [41.8764, -87.6250], "description": "Sullivan's masterpiece"},
+      {"name": "Marquette Building", "coordinates": [41.8788, -87.6302], "description": "Chicago School landmark"}
+    ]
+  },
+  "Colonial architecture": {
+    "regions": [
+      {"name": "Boston, USA", "center": [42.3601, -71.0589], "radius_km": 200, "description": "American Colonial heritage"},
+      {"name": "Havana, Cuba", "center": [23.1136, -82.3666], "radius_km": 100, "description": "Spanish Colonial"}
+    ],
+    "buildings": [
+      {"name": "Independence Hall", "coordinates": [39.9489, -75.1500], "description": "American Colonial landmark"},
+      {"name": "Old State House", "coordinates": [42.3588, -71.0578], "description": "Boston Colonial building"}
+    ]
+  },
+  "Deconstructivism": {
+    "regions": [
+      {"name": "Bilbao, Spain", "center": [43.2687, -2.9340], "radius_km": 50, "description": "Guggenheim Museum"},
+      {"name": "Prague, Czech Republic", "center": [50.0755, 14.4378], "radius_km": 50, "description": "Dancing House"}
+    ],
+    "buildings": [
+      {"name": "Guggenheim Bilbao", "coordinates": [43.2687, -2.9340], "description": "Frank Gehry's masterpiece"},
+      {"name": "Dancing House", "coordinates": [50.0755, 14.4142], "description": "Gehry and Milunić design"}
+    ]
+  },
+  "Edwardian architecture": {
+    "regions": [
+      {"name": "London, UK", "center": [51.5074, -0.1278], "radius_km": 100, "description": "Edwardian England"}
+    ],
+    "buildings": [
+      {"name": "Victoria and Albert Museum", "coordinates": [51.4966, -0.1722], "description": "Edwardian museum"},
+      {"name": "Selfridges", "coordinates": [51.5144, -0.1528], "description": "Edwardian department store"}
+    ]
+  },
+  "Georgian architecture": {
+    "regions": [
+      {"name": "Bath, UK", "center": [51.3811, -2.3590], "radius_km": 50, "description": "Georgian city"},
+      {"name": "Dublin, Ireland", "center": [53.3498, -6.2603], "radius_km": 50, "description": "Georgian Dublin"}
+    ],
+    "buildings": [
+      {"name": "Royal Crescent", "coordinates": [51.3869, -2.3681], "description": "Iconic Georgian terrace"},
+      {"name": "Georgian Dublin", "coordinates": [53.3389, -6.2633], "description": "Merrion Square"}
+    ]
+  },
+  "Gothic architecture": {
+    "regions": [
+      {"name": "Paris, France", "center": [48.8530, 2.3499], "radius_km": 200, "description": "French Gothic cathedrals"},
+      {"name": "Cologne, Germany", "center": [50.9413, 6.9583], "radius_km": 100, "description": "German Gothic"}
+    ],
+    "buildings": [
+      {"name": "Notre-Dame de Paris", "coordinates": [48.8530, 2.3499], "description": "French Gothic cathedral"},
+      {"name": "Cologne Cathedral", "coordinates": [50.9413, 6.9583], "description": "Largest Gothic church"}
+    ]
+  },
+  "Greek Revival architecture": {
+    "regions": [
+      {"name": "Athens, Greece", "center": [37.9838, 23.7275], "radius_km": 100, "description": "Ancient Greek temples"},
+      {"name": "Washington DC, USA", "center": [38.8977, -77.0365], "radius_km": 50, "description": "American neoclassical"}
+    ],
+    "buildings": [
+      {"name": "Parthenon", "coordinates": [37.9715, 23.7267], "description": "Ancient Greek temple"},
+      {"name": "Lincoln Memorial", "coordinates": [38.8893, -77.0502], "description": "Greek Revival monument"}
+    ]
+  },
+  "International style": {
+    "regions": [
+      {"name": "New York, USA", "center": [40.7580, -73.9718], "radius_km": 100, "description": "Modernist skyscrapers"},
+      {"name": "Brasilia, Brazil", "center": [-15.7942, -47.8825], "radius_km": 50, "description": "Modernist capital"}
+    ],
+    "buildings": [
+      {"name": "Seagram Building", "coordinates": [40.7580, -73.9718], "description": "Mies van der Rohe design"},
+      {"name": "Villa Savoye", "coordinates": [48.9242, 2.0287], "description": "Le Corbusier masterpiece"}
+    ]
+  },
+  "Novelty architecture": {
+    "regions": [
+      {"name": "Los Angeles, USA", "center": [34.0522, -118.2437], "radius_km": 200, "description": "Roadside attractions"}
+    ],
+    "buildings": [
+      {"name": "Randy's Donuts", "coordinates": [33.9425, -118.3430], "description": "Giant donut building"},
+      {"name": "The Big Duck", "coordinates": [40.8270, -72.5176], "description": "Duck-shaped building"}
+    ]
+  },
+  "Palladian architecture": {
+    "regions": [
+      {"name": "Vicenza, Italy", "center": [45.5455, 11.5354], "radius_km": 100, "description": "Palladio's hometown"}
+    ],
+    "buildings": [
+      {"name": "Villa Rotonda", "coordinates": [45.5246, 11.5571], "description": "Palladio's masterpiece"},
+      {"name": "Chiswick House", "coordinates": [51.4836, -0.2577], "description": "English Palladian villa"}
+    ]
+  },
+  "Postmodern architecture": {
+    "regions": [
+      {"name": "Portland, USA", "center": [45.5152, -122.6784], "radius_km": 100, "description": "Portland Building"},
+      {"name": "London, UK", "center": [51.5074, -0.1278], "radius_km": 100, "description": "Postmodern landmarks"}
+    ],
+    "buildings": [
+      {"name": "Portland Building", "coordinates": [45.5155, -122.6793], "description": "Michael Graves design"},
+      {"name": "AT&T Building", "coordinates": [40.7614, -73.9776], "description": "Philip Johnson design"}
+    ]
+  },
+  "Queen Anne architecture": {
+    "regions": [
+      {"name": "San Francisco, USA", "center": [37.7749, -122.4194], "radius_km": 100, "description": "Victorian houses"},
+      {"name": "London, UK", "center": [51.5074, -0.1278], "radius_km": 100, "description": "British Queen Anne"}
+    ],
+    "buildings": [
+      {"name": "Painted Ladies", "coordinates": [37.7763, -122.4328], "description": "Famous Victorian row"},
+      {"name": "Carson Mansion", "coordinates": [40.7853, -124.1637], "description": "Queen Anne masterpiece"}
+    ]
+  },
+  "Romanesque architecture": {
+    "regions": [
+      {"name": "Pisa, Italy", "center": [43.7228, 10.4017], "radius_km": 150, "description": "Italian Romanesque"},
+      {"name": "Speyer, Germany", "center": [49.3173, 8.4411], "radius_km": 100, "description": "German Romanesque"}
+    ],
+    "buildings": [
+      {"name": "Leaning Tower of Pisa", "coordinates": [43.7230, 10.3966], "description": "Famous bell tower"},
+      {"name": "Speyer Cathedral", "coordinates": [49.3173, 8.4411], "description": "Largest Romanesque church"}
+    ]
+  },
+  "Russian Revival architecture": {
+    "regions": [
+      {"name": "Moscow, Russia", "center": [55.7558, 37.6173], "radius_km": 200, "description": "Russian Orthodox churches"},
+      {"name": "Saint Petersburg, Russia", "center": [59.9311, 30.3609], "radius_km": 100, "description": "Imperial Russian"}
+    ],
+    "buildings": [
+      {"name": "Saint Basil's Cathedral", "coordinates": [55.7525, 37.6231], "description": "Iconic Russian landmark"},
+      {"name": "Church of the Savior on Blood", "coordinates": [59.9400, 30.3289], "description": "Russian Revival church"}
+    ]
+  },
+  "Tudor Revival architecture": {
+    "regions": [
+      {"name": "London, UK", "center": [51.5074, -0.1278], "radius_km": 150, "description": "English Tudor style"}
+    ],
+    "buildings": [
+      {"name": "Hampton Court Palace", "coordinates": [51.4036, -0.3376], "description": "Tudor royal palace"},
+      {"name": "Liberty London", "coordinates": [51.5138, -0.1403], "description": "Tudor Revival department store"}
+    ]
+  }
+}
