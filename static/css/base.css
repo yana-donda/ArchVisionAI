@@ -1,0 +1,23 @@
+:root {
+    --dark-gray: #5D5C61;
+    --teal: #379683;
+    --steel-blue: #7395AE;
+    --blue-gray: #557A95;
+    --beige: #B1A296;
+    --white: #ffffff;
+    --glass-bg: rgba(255, 255, 255, 0.12);
+    --glass-border: rgba(255, 255, 255, 0.18);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Montserrat', 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    color: var(--white);
+    overflow-x: hidden;
+}
