@@ -240,11 +240,17 @@ def get_user_stats(user_id: int, base_dir: Path | None = None) -> Dict[str, Any]
     avg_conf = cur.fetchone()["avg_confidence"] or 0
 
     conn.close()
+    
+    popular_styles = [
+        {"style": r["architectural_style"], "count": r["count"]}
+        for r in favorite_styles
+        if r.get("architectural_style")
+    ]
 
     return {
-        "total_queries": total,
-        "favorite_styles": favorite_styles,
-        "average_confidence": round(float(avg_conf), 3) if avg_conf else 0.0,
+        "total_analyses": total,
+        "popular_styles": popular_styles,
+        "favorite_style": round(float(avg_conf), 3) if avg_conf else 0.0,
     }
 
 

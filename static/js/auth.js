@@ -160,7 +160,7 @@ function showUserHistory() {
 
             L.popup()
                 .setLatLng([49.8397, 24.0297])
-                .setContent(`<div><h4>Analysis History</h4>${content}</div>`)
+                .setContent(`<div><h4>Історія аналізів</h4>${content}</div>`)
                 .openOn(architecturalMap);
         }
     });
@@ -174,18 +174,18 @@ function showUserStats() {
             <div style="text-align: center;">
                 <div style="margin: 10px 0;">
                     <div style="font-size: 24px; color: var(--teal); font-weight: bold;">${window.userStatsData?.total_analyses || 0}</div>
-                    <div style="font-size: 12px;">Total Analyses</div>
+                    <div style="font-size: 12px;">Всього аналізів</div>
                 </div>
                 <div style="margin: 10px 0;">
                     <div style="font-size: 18px; color: var(--teal); font-weight: bold;">${window.userStatsData?.favorite_style || '-'}</div>
-                    <div style="font-size: 12px;">Favorite Style</div>
+                    <div style="font-size: 12px;">Улюблений стиль</div>
                 </div>
             </div>
         `;
 
         L.popup()
             .setLatLng([46.4825, 30.7233])
-            .setContent(`<div><h4>Statistics</h4>${content}</div>`)
+            .setContent(`<div><h4>Статистика</h4>${content}</div>`)
             .openOn(architecturalMap);
     });
 }
@@ -223,45 +223,80 @@ function updateHistoryBlock(historyData) {
     const historyContent = document.getElementById('historyContent');
     if (!historyContent || !historyData || !historyData.history) return;
 
+    const fallbackSvg =
+        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNmMGYwZjAiLz48dGV4dCB4PSI3NSIgeT0iNzUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIGltYWdlPC90ZXh0Pjwvc3ZnPg==';
+
+    function guessMimeFromBase64(b64) {
+        if (!b64) return 'image/jpeg';
+        if (b64.startsWith('/9j/')) return 'image/jpeg'; // JPEG
+        if (b64.startsWith('iVBOR')) return 'image/png'; // PNG
+        if (b64.startsWith('R0lGOD')) return 'image/gif'; // GIF
+        return 'image/jpeg';
+    }
+
+    function buildThumbnailSrc(item) {
+        const t = (item.image_thumbnail || '').trim();
+
+        // 1) вже готовий data URL
+        if (t.startsWith('data:image/')) return t;
+
+        // 2) URL/абсолютний шлях
+        if (t.startsWith('/') || t.startsWith('http://') || t.startsWith('https://')) return t;
+
+        // 3) base64 (намагаємось розпізнати тип)
+        if (t && /^[A-Za-z0-9+/=]+$/.test(t)) {
+        const mime = guessMimeFromBase64(t);
+        return `data:${mime};base64,${t}`;
+        }
+
+        // 4) якщо схоже на шлях у dataset (типу "Achaemenid architecture/000092.jpg")
+        const filePath = (item.image_name || '').trim();
+        if (filePath && filePath.includes('/')) {
+        return `/api/dataset/image/${encodeURI(filePath)}`;
+        }
+
+        return fallbackSvg;
+    }
+
     if (historyData.history.length === 0) {
-        historyContent.innerHTML = '<p style="color: rgba(255,255,255,0.6); text-align: center;">No analysis history</p>';
+        historyContent.innerHTML =
+        '<p style="color: rgba(255,255,255,0.6); text-align: center;">Немає історії аналізів</p>';
         return;
     }
 
     const historyHTML = historyData.history.slice(0, 10).map(function (item) {
-        const thumbnailSrc = item.image_thumbnail
-            ? `data:image/jpeg;base64,${item.image_thumbnail}`
-            : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNmMGYwZjAiLz48dGV4dCB4PSI3NSIgeT0iNzUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIGltYWdlPC90ZXh0Pjwvc3ZnPg==';
+        const thumbnailSrc = buildThumbnailSrc(item);
 
         const confidence = Math.round((item.confidence || 0) * 100);
         const date = new Date(item.created_at).toLocaleDateString('uk-UA');
 
         return `
-            <div style="display: flex; gap: 10px; padding: 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; margin-bottom: 10px; background: rgba(0,0,0,0.2);">
-                <img src="${thumbnailSrc}"
-                     style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0;"
-                     alt="">
-                <div style="flex: 1; min-width: 0; color: #fff;">
-                    <div style="font-weight: bold; color: var(--teal); margin-bottom: 4px; font-size: 14px;">
-                        ${item.architectural_style || 'Unknown style'}
-                    </div>
-                    <div style="color: rgba(255,255,255,0.6); font-size: 12px; margin-bottom: 4px;">
-                        Confidence: ${confidence}%
-                    </div>
-                    <div style="color: #999; font-size: 11px;">
-                        ${date}
-                    </div>
-                </div>
+        <div style="display: flex; gap: 10px; padding: 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; margin-bottom: 10px; background: rgba(0,0,0,0.2);">
+            <img src="${thumbnailSrc}"
+                onerror="this.onerror=null;this.src='${fallbackSvg}'"
+                style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0;"
+                alt="">
+            <div style="flex: 1; min-width: 0; color: #fff;">
+            <div style="font-weight: bold; color: var(--teal); margin-bottom: 4px; font-size: 14px;">
+                ${item.architectural_style || 'Невідомий стиль'}
             </div>
+            <div style="color: rgba(255,255,255,0.6); font-size: 12px; margin-bottom: 4px;">
+                Впевненість: ${confidence}%
+            </div>
+            <div style="color: #999; font-size: 11px;">
+                ${date}
+            </div>
+            </div>
+        </div>
         `;
     }).join('');
 
     historyContent.innerHTML = `
         <div style="max-height: 400px; overflow-y: auto;">
-            ${historyHTML}
+        ${historyHTML}
         </div>
         <div style="text-align: center; margin-top: 10px;">
-            <small style="color: rgba(255,255,255,0.6);">Latest ${Math.min(historyData.history.length, 10)} analyses</small>
+        <small style="color: rgba(255,255,255,0.6);">Останні ${Math.min(historyData.history.length, 10)} аналізів</small>
         </div>
     `;
 }
