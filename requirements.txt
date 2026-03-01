@@ -9,3 +9,4 @@ flask-cors
 flask-session
 google-genai
 python-dotenv
+matplotlib
