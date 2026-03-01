@@ -67,7 +67,7 @@ function initMap() {
     }).addTo(architecturalMap);
 }
 
-async function addStyleToMap(styleName) {
+async function addStyleToMap(styleName, styleLabelUk) {
     if (!architecturalMap) return;
 
     // Remove previous style markers
@@ -79,6 +79,9 @@ async function addStyleToMap(styleName) {
     try {
         const response = await fetch('/models/architectural_styles_geography.json');
         const geoData = await response.json();
+
+        const trResp = await fetch('/models/architectural_geography_ukrainian.json?v=1');
+        const tr = await trResp.json();
 
         let styleData = null;
         if (geoData.architectural_styles && geoData.architectural_styles[styleName]) {
@@ -119,9 +122,9 @@ async function addStyleToMap(styleName) {
 
                     circle.bindPopup(`
                         <div style="text-align: center; padding: 10px;">
-                            <h4 style="color: var(--teal); margin: 0 0 5px 0;">${region.name}</h4>
-                            <p style="margin: 5px 0;"><strong>Style:</strong> ${styleName}</p>
-                            <p style="margin: 5px 0;">${region.description}</p>
+                            <h4 style="color: var(--teal); margin: 0 0 5px 0;">${(tr.regions && tr.regions[region.name]) || region.name}</h4>
+                            <p style="margin: 5px 0;"><strong>Стиль:</strong> ${styleLabelUk || styleName}</p>
+                            <p style="margin: 5px 0;">${(tr.descriptions && tr.descriptions[region.description]) || region.description}</p>
                         </div>
                     `);
 
@@ -162,9 +165,9 @@ async function addStyleToMap(styleName) {
 
                     marker.bindPopup(`
                         <div style="text-align: center; padding: 10px;">
-                            <h4 style="color: var(--teal); margin: 0 0 5px 0;">${building.name}</h4>
-                            <p style="margin: 5px 0;"><strong>Style:</strong> ${styleName}</p>
-                            <p style="margin: 5px 0;">${building.description}</p>
+                            <h4 style="color: var(--teal); margin: 0 0 5px 0;">${(tr.buildings && tr.buildings[building.name]) || building.name}</h4>
+                            <p style="margin: 5px 0;"><strong>Стиль:</strong> ${styleLabelUk || styleName}</p>
+                            <p style="margin: 5px 0;">${(tr.building_descriptions && tr.building_descriptions[building.description]) || building.description}</p>
                         </div>
                     `);
 
@@ -206,7 +209,7 @@ const modelInfo = {
         params: '5.3M',
         input_size: 224,
         batch_size: 32,
-        accuracy: '73.64%',
+        accuracy: '74.93%',
         description: 'Швидка та точна модель, оптимальний баланс'
     },
     'resnet50': {
@@ -214,7 +217,7 @@ const modelInfo = {
         params: '25.6M',
         input_size: 224,
         batch_size: 24,
-        accuracy: '71.96%',
+        accuracy: '74.93%',
         description: 'Класична архітектура, стабільна точність'
     },
     'ensemble': {

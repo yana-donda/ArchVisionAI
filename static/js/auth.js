@@ -201,11 +201,9 @@ function updateGeminiBlock(analysisText) {
         return index % 2 === 1 ? `<strong>${part}</strong>` : part;
     }).join('');
 
-    formattedText = formattedText.replace(/\\n/g, '<br>');
-
-    let lines = formattedText.split('\\n');
+    let lines = formattedText.split('\n');
     for (let i = 0; i < lines.length; i++) {
-        if (lines[i].match(/^\\d+\\./)) {
+        if (lines[i].match(/^\d+\./)) {
             lines[i] = '<div style="margin: 8px 0; padding-left: 15px;">' + lines[i] + '</div>';
         }
     }

@@ -166,7 +166,7 @@ function displayResults(data) {
     // Карта
     if (originalStyleName && result.architectural_style) {
         if (typeof addStyleToMap === 'function') {
-            addStyleToMap(originalStyleName);
+            addStyleToMap(originalStyleName, styleName);
         }
     }
 
