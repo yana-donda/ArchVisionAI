@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ArchVision AI - Аналізатор архітектурних стилів</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/temple.png') }}?v=1">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
@@ -22,7 +23,7 @@
         <!-- Logo section -->
         <div class="logo-section">
             <div class="logo">
-                <span class="logo-icon">🏛️</span>
+                <img class="logo-icon-img" src="{{ url_for('static', filename='icons/temple_front.png') }}" alt="ArchVision AI">
                 <span class="logo-text">ArchVision AI</span>
             </div>
             <p class="logo-subtitle">Універсальний архітектурний аналізатор</p>
@@ -55,7 +56,7 @@
         <div class="model-selector-block" id="modelZooBlock">
             <div class="model-selector-header">
                 <div class="model-selector-title">
-                    <span>🧠</span> Вибір моделі
+                    <img class="ui-icon" src="{{ url_for('static', filename='icons/brain.png') }}" alt="" aria-hidden="true">Вибір моделі
                 </div>
                 <span class="model-badge balanced" id="modelZooStatus">Завантаження...</span>
             </div>
@@ -63,8 +64,8 @@
             <!-- Model selection dropdown -->
             <select class="model-dropdown" id="modelSelector" onchange="onModelChange()">
                 <optgroup label="Режим аналізу">
-                    <option value="efficientnet_b0" selected>EfficientNet-B0 (73.64%)</option>
-                    <option value="resnet50">ResNet-50 (71.96%)</option>
+                    <option value="efficientnet_b0" selected>EfficientNet-B0 (74.93%)</option>
+                    <option value="resnet50">ResNet-50 (74.93%)</option>
                     <option value="ensemble">Ensemble (обидві моделі)</option>
                 </optgroup>
             </select>
@@ -92,10 +93,10 @@
             <!-- Analysis mode options -->
             <div class="analysis-options">
                 <button class="analysis-option-btn active" id="btnStandard" onclick="setAnalysisMode('standard')">
-                    <span>⚡</span> Стандартний
+                    <img class="ui-icon" src="{{ url_for('static', filename='icons/flash.png') }}" alt="" aria-hidden="true">Стандартний
                 </button>
                 <button class="analysis-option-btn" id="btnTTA" onclick="setAnalysisMode('tta')">
-                    <span>🎯</span> TTA
+                    <img class="ui-icon" src="{{ url_for('static', filename='icons/target.png') }}" alt="" aria-hidden="true">TTA
                 </button>
             </div>
 
@@ -108,7 +109,7 @@
 
         <!-- Main block: upload and analyze -->
         <div class="upload-block glass-card">
-            <h2>🏛️ Архітектурний аналіз</h2>
+            <h2><img class="ui-icon-lg" src="{{ url_for('static', filename='icons/museum.png') }}" alt="" aria-hidden="true">Архітектурний аналіз</h2>
             <div class="upload-area" id="uploadArea">
                 <div class="upload-text">
                     <strong>Оберіть архітектурне зображення</strong><br>
@@ -130,7 +131,7 @@
         <div id="userBlocks" style="display: none; flex-direction: column; gap: 20px; margin-top: 20px;">
             <!-- Gemini AI block -->
             <div class="user-block" id="geminiBlock">
-                <h3>🤖 Аналіз Gemini AI</h3>
+                <h3><img class="ui-icon" src="{{ url_for('static', filename='icons/robot.png') }}" alt="" aria-hidden="true">Аналіз Gemini AI</h3>
                 <div id="geminiContent">
                     Виконайте аналіз зображення для отримання розширеного аналізу ШІ
                 </div>
@@ -138,7 +139,7 @@
 
             <!-- History block -->
             <div class="user-block" id="historyBlock">
-                <h3>📚 Історія аналізу</h3>
+                <h3><img class="ui-icon" src="{{ url_for('static', filename='icons/clock.png') }}" alt="" aria-hidden="true">Історія аналізу</h3>
                 <div id="historyContent">
                     Ваша історія аналізу буде відображена тут після входу
                 </div>
@@ -146,7 +147,7 @@
 
             <!-- Statistics block -->
             <div class="user-block" id="statsBlock">
-                <h3>📊 Статистика</h3>
+                <h3><img class="ui-icon" src="{{ url_for('static', filename='icons/analytics.png') }}" alt="" aria-hidden="true">Статистика</h3>
                 <div id="statsContent">
                     Ваша статистика аналізу буде відображена тут
                 </div>
@@ -154,7 +155,7 @@
 
             <!-- Architectural styles block -->
             <div class="user-block" id="stylesBlock">
-                <h3>🏛️ Підтримувані стилі (25)</h3>
+                <h3><img class="ui-icon" src="{{ url_for('static', filename='icons/temple_front.png') }}" alt="" aria-hidden="true">Підтримувані стилі (25)</h3>
                 <div id="stylesContent">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; max-height: 300px; overflow-y: auto;">
                         <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Ахеменідська архітектура</div>
@@ -190,7 +191,7 @@
 
         <!-- Map block -->
         <div class="map-block glass-card">
-            <h2>🗺️ Архітектурна карта</h2>
+            <h2><img class="ui-icon-lg" src="{{ url_for('static', filename='icons/map.png') }}" alt="" aria-hidden="true">Архітектурна карта</h2>
             <div id="mapContainer">
                 <div id="architecturalMap" style="height: 500px; width: 100%; border-radius: 15px; overflow: hidden;"></div>
             </div>
