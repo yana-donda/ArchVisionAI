@@ -14,7 +14,12 @@ import torch
 import torch.nn.functional as F
 from PIL import Image, ImageEnhance, ImageOps
 
+from dotenv import load_dotenv
+from google import genai
+
 from model_zoo import ModelType, MODEL_CONFIGS, build_model, build_transform, load_checkpoint
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +39,7 @@ class ArchVisionAnalyzer:
         self.style_mapping = self._build_style_uk_mapping()
         self.geographical_data = self._load_geographical_data()
         self.ukrainian_geo_translations = self._load_ukrainian_geo_translations()
-
+        
         self.models: Dict[str, torch.nn.Module] = {}
         self.transforms: Dict[str, Any] = {}
         self.model_load_errors: Dict[str, str] = {}
@@ -47,6 +52,12 @@ class ArchVisionAnalyzer:
             os.getenv("GEMINI_API_KEY"),
         ]
         self.gemini_keys = [k for k in self.gemini_keys if k]
+        self.current_key_index = 0
+        self.gemini_client = None
+        self._gemini_ready = False
+        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        
+        self._initialize_gemini()
 
         logger.info("ArchVisionAnalyzer initialized (device=%s)", self.device)
 
@@ -164,9 +175,7 @@ class ArchVisionAnalyzer:
             data = json.load(f)
         return data
 
-    # ------------------------------
     # Model loading
-    # ------------------------------
     def _checkpoint_candidates(self, model_type: str) -> List[Path]:
         candidates = [self.checkpoints_dir / f"{model_type}_best.pth"]
 
@@ -222,9 +231,7 @@ class ArchVisionAnalyzer:
 
         return True
 
-    # ------------------------------
     # Inference helpers
-    # ------------------------------
     def _prepare_image(self, image: Image.Image) -> Image.Image:
         if image.mode != "RGB":
             image = image.convert("RGB")
@@ -326,17 +333,19 @@ class ArchVisionAnalyzer:
 
         return style_result
 
-    # ------------------------------
     # Geography translation
-    # ------------------------------
     def _translate_geographical_text(self, text: str) -> str:
         if not text:
             return text
 
-        for section in ("regions", "buildings", "descriptions", "building_descriptions"):
-            if text in self.ukrainian_geo_translations.get(section, {}):
-                return self.ukrainian_geo_translations[section][text]
+        translations = getattr(self, "ukrainian_geo_translations", {}) or {}
 
+        for section in ("regions", "buildings", "descriptions", "building_descriptions"):
+            mp = translations.get(section, {})
+            if text in mp:
+                return mp[text]
+
+        logger.debug("[UA-GEO] MISS: %r", text)
         return text
 
     def _get_geographical_data(self, style: str) -> Dict[str, Any]:
@@ -378,9 +387,7 @@ class ArchVisionAnalyzer:
             "famous_buildings": buildings_out,
         }
 
-    # ------------------------------
     # Public API
-    # ------------------------------
     async def analyze_full(self, image: Image.Image, use_tta: bool = False, model_type: str = "efficientnet_b0") -> Dict[str, Any]:
         try:
             if model_type == "ensemble":
@@ -388,18 +395,19 @@ class ArchVisionAnalyzer:
             else:
                 architectural_style = self._analyze_single_model(image, model_type=model_type, use_tta=use_tta)
 
-            gemini_analysis = await self._analyze_with_gemini_placeholder(image, architectural_style)
+            gemini_result = await self._analyze_with_gemini(image)
+            #gemini_analysis = await self._analyze_with_gemini_placeholder(image, architectural_style)
 
             return {
-                "gemini_analysis": gemini_analysis,
+                "gemini_analysis": gemini_result,
                 "architectural_style": architectural_style,
                 "supported_styles": self.architectural_styles,
                 "style_mapping": self.style_mapping,
                 "geographical_data": architectural_style.get("geographical_data", {}),
-                "verification": {
-                    "overall_quality": "good" if not gemini_analysis.get("error") else "partial",
-                    "consistency_score": 0.85 if not gemini_analysis.get("error") else 0.5,
-                },
+                #"verification": {
+                    #"overall_quality": "good" if not gemini_analysis.get("error") else "partial",
+                    #"consistency_score": 0.85 if not gemini_analysis.get("error") else 0.5,
+                #},
             }
 
         except Exception as e:
@@ -413,6 +421,89 @@ class ArchVisionAnalyzer:
                 },
                 "verification": {"overall_quality": "poor", "consistency_score": 0.0},
             }
+            
+    def _get_next_gemini_key(self):
+        if not self.gemini_keys:
+            return None
+        key = self.gemini_keys[self.current_key_index]
+        self.current_key_index = (self.current_key_index + 1) % len(self.gemini_keys)
+        return key
+
+    def _initialize_gemini(self):
+        try:
+            if not self.gemini_keys:
+                self._gemini_ready = False
+                return
+            api_key = self._get_next_gemini_key()
+            self.gemini_client = genai.Client(api_key=api_key)
+            self._gemini_ready = True
+        except Exception:
+            self._gemini_ready = False
+
+    async def _analyze_with_gemini(self, image):
+        
+        if not self._gemini_ready:
+            return {"error": "Gemini недоступний (нема ключа або помилка ініціалізації)"}
+
+        prompt = (
+            """Відповідай українською мовою. Будь точним та інформативним.
+            ВАЖЛИВО: без вступу, без привітань, без фраз типу 'Чудово' або 'Давайте'.
+            ФОРМАТ: рівно 8 рядків. Кожен рядок починай з '1. ...', '2. ...' і так далі .
+            Назву кожного пункту виділяй через **жирний текст** у Markdown.
+            Ти експерт з архітектури. Проаналізуй це зображення будівлі та визнач:
+            1. **Архітектурний стиль:** Точно визнач архітектурний стиль (наприклад: готика, барокко, модернізм, класицизм, арт-деко, баухаус тощо)
+            2. **Назва будівлі:** Якщо це відома будівля, вкажи її назву (наприклад: Собор Паризької Богоматері, Оперний театр Сіднея тощо)
+            3. **Місцезнаходження:** Вкажи місто, країну та по можливості адресу
+            4. **Архітектор:** Якщо відомо, вкажи ім'я архітектора
+            5. **Рік будівництва:** Коли була побудована будівля
+            6. **Ключові архітектурні елементи:** Опиши характерні деталі (колони, арки, орнаменти, вікна, дах тощо)"
+            7. **Історична цінність:** Чому ця будівля важлива
+            8. **Сучасне використання:** Як використовується будівля зараз"""
+        )
+
+        for attempt in range(max(1, len(self.gemini_keys))):
+            try:
+                if attempt > 0:
+                    api_key = self._get_next_gemini_key()
+                    self.gemini_client = genai.Client(api_key=api_key)
+
+                def _call():
+                    return self.gemini_client.models.generate_content(
+                        model=self.gemini_model,
+                        contents=[image, prompt],
+                    )
+
+                response = await asyncio.to_thread(_call)
+
+                analysis = getattr(response, "text", None)
+                if not analysis:
+                    # fallback: дістаємо текст із candidates/parts
+                    try:
+                        analysis = response.candidates[0].content.parts[0].text
+                    except Exception:
+                        analysis = ""
+
+                analysis = (analysis or "").strip()
+                
+                logger.info(f"Gemini text length: {len(analysis)}")
+                logger.info(f"Gemini preview: {analysis[:150]}")
+
+                if not analysis:
+                    # що прийшло, але тексту нема
+                    return {"error": "Gemini повернув порожній текст", "raw": str(response)}
+
+                return {
+                    "analysis": analysis,
+                    "description": analysis,
+                    "summary": analysis,
+                    "confidence": 0.85,
+                    "model": "gemini-2.5-flash",
+                }
+            except Exception as e:
+                if attempt == len(self.gemini_keys) - 1:
+                    return {"error": f"Помилка Gemini: {str(e)}"}
+
+        return {"error": "Помилка Gemini"}
 
     async def _analyze_with_gemini_placeholder(self, image: Image.Image, style_result: Dict[str, Any]) -> Dict[str, Any]:
         """

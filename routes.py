@@ -147,14 +147,14 @@ def analyze():
             top_pred = style_data.get("top_prediction", {})
 
             ai_text = ""
-            gemini = result.get("gemini_analysis", {})
-            if gemini:
-                ai_text = (
-                    gemini.get("summary")
-                    or gemini.get("historical_context")
-                    or gemini.get("error")
-                    or ""
-                )
+            gemini = result.get("gemini_analysis", {}) or {}
+            ai_text = (
+                gemini.get("analysis")
+                or gemini.get("summary")
+                or gemini.get("historical_context")
+                or gemini.get("error")
+                or ""
+            )
 
             save_query_history(
                 user_id=session["user_id"],
