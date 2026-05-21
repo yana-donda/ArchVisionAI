@@ -24,9 +24,9 @@ def create_app() -> Flask:
 
     # Basic config
     app.config["BASE_DIR"] = base_dir
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
-    app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
-    app.config["CURRENT_ANALYSIS_MODE"] = "efficientnet_b0"
+    secret_key = os.getenv("SECRET_KEY")
+    app.config["SECRET_KEY"] = secret_key
+    app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024  # 15MB
 
     # Logging
     logging.basicConfig(
@@ -45,7 +45,7 @@ def create_app() -> Flask:
 
     @app.errorhandler(413)
     def too_large(e):
-        return jsonify({"error": "File too large"}), 413
+        return jsonify({"error": "Розмір файлу занадто великий. Максимальний розмір — 15 МБ."}), 413
 
     return app
 

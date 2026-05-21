@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import json
 import logging
+import re
 from functools import wraps
 from pathlib import Path
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from flask import (
     Blueprint,
@@ -22,11 +23,16 @@ from database import (
     get_user_preferences,
     get_user_stats,
     save_query_history,
+    update_query_history_ai_analysis,
 )
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("main", __name__)
+
+USERNAME_PATTERN = re.compile(r"^[A-Za-zА-Яа-яІіЇїЄєҐґ0-9_]+$")
+
+PASSWORD_PATTERN = re.compile(r"^[A-Za-z0-9!@#$%_.?\-]+$")
 
 
 def _base_dir() -> Path:
@@ -53,28 +59,60 @@ def index():
 
 @bp.route("/models/<path:filename>")
 def serve_models_json(filename: str):
-    data_dir = _base_dir() / "data"
-    file_path = data_dir / filename
-    if not file_path.exists():
+    data_dir = (_base_dir() / "data").resolve()
+    resolved = (data_dir / filename).resolve()
+
+    try:
+        relative_path = resolved.relative_to(data_dir)
+    except ValueError:
         return jsonify({"error": "File not found"}), 404
-    return send_from_directory(str(data_dir), filename)
+
+    if not resolved.is_file() or resolved.suffix.lower() != ".json":
+        return jsonify({"error": "File not found"}), 404
+
+    return send_from_directory(str(data_dir), relative_path.as_posix())
 
 
 @bp.route("/api/auth/register", methods=["POST"])
 def register():
     try:
         if not request.is_json:
-            return jsonify({"error": "Invalid request"}), 400
+            return jsonify({"error": "Некоректний запит"}), 400
 
         data = request.get_json(silent=True) or {}
         username = (data.get("username") or "").strip()
         password = data.get("password") or ""
 
         if not username or not password:
-            return jsonify({"error": "Username and password required"}), 400
+            return jsonify({"error": "Вкажіть ім’я користувача та пароль"}), 400
 
-        if len(password) < 4:
-            return jsonify({"error": "Password must be at least 4 characters"}), 400
+        if len(username) < 4:
+            return jsonify({"error": "Логін має містити щонайменше 4 символи"}), 400
+
+        if len(username) > 50:
+            return jsonify({"error": "Логін має містити не більше 50 символів"}), 400
+
+        if not USERNAME_PATTERN.fullmatch(username):
+            return jsonify({
+                "error": "Логін може містити тільки літери української або англійської абетки, цифри та нижнє підкреслення"
+            }), 400
+
+        if len(password) < 8:
+            return jsonify({"error": "Пароль має містити щонайменше 8 символів"}), 400
+
+        if len(password) > 20:
+            return jsonify({"error": "Пароль має містити не більше 20 символів"}), 400
+
+        if not PASSWORD_PATTERN.fullmatch(password):
+            return jsonify({
+                "error": "Пароль може містити тільки англійські літери, цифри та символи: ! @ # $ % _ - . ?"
+            }), 400
+
+        if not re.search(r"[A-Za-z]", password):
+            return jsonify({"error": "Пароль має містити щонайменше одну англійську літеру"}), 400
+
+        if not re.search(r"\d", password):
+            return jsonify({"error": "Пароль має містити щонайменше одну цифру"}), 400
 
         ok, msg = create_user(username, password, _base_dir())
         if not ok:
@@ -84,40 +122,40 @@ def register():
 
     except Exception as e:
         logger.exception("Registration error")
-        return jsonify({"error": f"Server error: {str(e)}"}), 500
+        return jsonify({"error": f"Помилка сервера: {str(e)}"}), 500
 
 
 @bp.route("/api/auth/login", methods=["POST"])
 def login():
     try:
         if not request.is_json:
-            return jsonify({"error": "Invalid request"}), 400
+            return jsonify({"error": "Некоректний запит"}), 400
 
         data = request.get_json(silent=True) or {}
         username = (data.get("username") or "").strip()
         password = data.get("password") or ""
 
         if not username or not password:
-            return jsonify({"error": "Username and password required"}), 400
+            return jsonify({"error": "Ім'я користувача та пароль є обов'язковими"}), 400
 
         user = authenticate_user(username, password, _base_dir())
         if not user:
-            return jsonify({"error": "Invalid username or password"}), 401
+            return jsonify({"error": "Неправильне ім'я користувача або пароль"}), 401
 
         session["user_id"] = user["id"]
         session["username"] = user["username"]
 
-        return jsonify({"message": "Login successful", "user": user})
+        return jsonify({"message": "Вхід успішно виконано", "user": user})
 
     except Exception as e:
         logger.exception("Login error")
-        return jsonify({"error": f"Server error: {str(e)}"}), 500
+        return jsonify({"error": f"Помилка сервера: {str(e)}"}), 500
 
 
 @bp.route("/api/auth/logout", methods=["POST"])
 def logout_route():
     session.clear()
-    return jsonify({"message": "Logout successful"})
+    return jsonify({"message": "Вихід успішно виконано"})
 
 
 @bp.route("/api/auth/status")
@@ -136,44 +174,81 @@ def auth_status():
 def analyze():
     try:
         service = _service()
-        current_mode = current_app.config.get("CURRENT_ANALYSIS_MODE", "efficientnet_b0")
 
-        result = service.analyze_request(request, mode_override=current_mode)
+        result = service.analyze_request(request, include_gemini=False)
 
-        # Зберігаємо в history тільки для авторизованого користувача
         if "user_id" in session and not result.get("error"):
             meta = result.get("_meta", {})
             style_data = result.get("architectural_style", {})
             top_pred = style_data.get("top_prediction", {})
 
-            ai_text = ""
-            gemini = result.get("gemini_analysis", {}) or {}
-            ai_text = (
-                gemini.get("analysis")
-                or gemini.get("summary")
-                or gemini.get("historical_context")
-                or gemini.get("error")
-                or ""
-            )
-
-            save_query_history(
+            history_id = save_query_history(
                 user_id=session["user_id"],
                 image_name=meta.get("image_name", "uploaded_image"),
                 image_thumbnail=meta.get("image_thumbnail", ""),
                 architectural_style=top_pred.get("style_uk") or top_pred.get("style") or "Невідомо",
                 confidence=float(top_pred.get("confidence", 0.0)),
-                ai_analysis=ai_text,
+                ai_analysis="",
                 base_dir=_base_dir(),
             )
+
+            result["history_id"] = history_id
 
         result.pop("_meta", None)
         return jsonify(result)
 
+    except RequestEntityTooLarge:
+        return jsonify({
+            "error": "Файл занадто великий. Максимальний розмір — 20 МБ."
+        }), 413
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         logger.exception("Analyze error")
-        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
+        return jsonify({"error": f"Помилка аналізу: {str(e)}"}), 500
+    
+    
+@bp.route("/api/analyze/gemini", methods=["POST"])
+@login_required
+def analyze_gemini():
+    try:
+        data = request.get_json(silent=True) if request.is_json else {}
+        history_id = data.get("history_id")
+
+        result = _service().analyze_gemini_request(request)
+
+        gemini = result.get("gemini_analysis", {}) or {}
+        ai_text = (
+            gemini.get("analysis")
+            or gemini.get("summary")
+            or gemini.get("description")
+            or gemini.get("historical_context")
+            or gemini.get("error")
+            or ""
+        )
+
+        if history_id and ai_text:
+            try:
+                update_query_history_ai_analysis(
+                    user_id=session["user_id"],
+                    history_id=int(history_id),
+                    ai_analysis=ai_text,
+                    base_dir=_base_dir(),
+                )
+            except (TypeError, ValueError):
+                logger.warning("Invalid history_id for Gemini update: %r", history_id)
+
+        return jsonify(result)
+
+    except RequestEntityTooLarge:
+        return jsonify({
+            "error": "Файл занадто великий. Максимальний розмір — 20 МБ."
+        }), 413
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.exception("Gemini analyze error")
+        return jsonify({"error": f"Помилка Gemini: {str(e)}"}), 500
 
 
 @bp.route("/api/user/history")
@@ -209,21 +284,18 @@ def user_preferences():
         return jsonify({"error": str(e)}), 500
 
 
-# Model mode endpoints
 @bp.route("/api/models/available")
 def available_models():
     try:
         service = _service()
-        trained = service.get_trained_models()
-        current = current_app.config.get("CURRENT_ANALYSIS_MODE", "efficientnet_b0")
+        modes = service.get_available_modes()
 
         return jsonify(
             {
                 "available": True,
-                "models": service.get_available_modes(),
-                "trained_models": trained,
-                "current_model": current,
-                "count": len(service.get_available_modes()),
+                "models": modes,
+                "current_model": service.get_current_mode(),
+                "count": len(modes),
             }
         )
     except Exception as e:
@@ -233,7 +305,7 @@ def available_models():
 
 @bp.route("/api/models/current")
 def current_model():
-    return jsonify({"model_type": current_app.config.get("CURRENT_ANALYSIS_MODE", "efficientnet_b0")})
+    return jsonify({"model_type": _service().get_current_mode()})
 
 
 @bp.route("/api/models/switch", methods=["POST"])
@@ -248,8 +320,6 @@ def switch_model():
         ok, msg = _service().switch_mode(model_type)
         if not ok:
             return jsonify({"success": False, "message": msg}), 400
-
-        current_app.config["CURRENT_ANALYSIS_MODE"] = model_type
 
         names = {
             "efficientnet_b0": "EfficientNet-B0",
@@ -285,9 +355,3 @@ def dataset_image(filepath: str):
 
     directory, filename = resolved
     return send_from_directory(directory, filename)
-
-
-# Checkpoints
-@bp.route("/api/training/checkpoints")
-def training_checkpoints():
-    return jsonify({"checkpoints": _service().list_checkpoints()})

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import io
 import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -18,8 +16,6 @@ from dotenv import load_dotenv
 from google import genai
 
 from model_zoo import ModelType, MODEL_CONFIGS, build_model, build_transform, load_checkpoint
-
-load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +32,7 @@ class ArchVisionAnalyzer:
         self.idx_to_class = self._build_idx_to_class(self.class_mapping)
         self.architectural_styles = [self.idx_to_class[i] for i in sorted(self.idx_to_class.keys())]
 
-        self.style_mapping = self._build_style_uk_mapping()
+        self.style_mapping = self._load_style_uk_mapping()
         self.geographical_data = self._load_geographical_data()
         self.ukrainian_geo_translations = self._load_ukrainian_geo_translations()
         
@@ -47,9 +43,7 @@ class ArchVisionAnalyzer:
         self.gemini_keys = [
             os.getenv("GEMINI_API_KEY_1"),
             os.getenv("GEMINI_API_KEY_2"),
-            os.getenv("GEMINI_API_KEY_3"),
-            os.getenv("GEMINI_API_KEY_4"),
-            os.getenv("GEMINI_API_KEY"),
+            os.getenv("GEMINI_API_KEY_3")
         ]
         self.gemini_keys = [k for k in self.gemini_keys if k]
         self.current_key_index = 0
@@ -58,6 +52,13 @@ class ArchVisionAnalyzer:
         self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         
         self._initialize_gemini()
+        
+        logger.info(
+            "Gemini initialized: ready=%s, model=%s, keys=%s",
+            self._gemini_ready,
+            self.gemini_model,
+            len(self.gemini_keys),
+        )
 
         logger.info("ArchVisionAnalyzer initialized (device=%s)", self.device)
 
@@ -66,103 +67,51 @@ class ArchVisionAnalyzer:
     # ------------------------------
     def _load_class_mapping(self) -> Dict[str, int]:
         path = self.data_dir / "class_mapping.json"
+
         if not path.exists():
             logger.warning("class_mapping.json not found: %s", path)
+            raise FileNotFoundError(f"class_mapping.json not found: {path}")
+
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if not isinstance(data, dict):
+            raise ValueError("class_mapping.json має бути JSON-об'єктом")
+
+        return {str(style): int(index) for style, index in data.items()}
+
+    def _build_idx_to_class(self, class_mapping: Dict[str, int]) -> Dict[int, str]:
+        if not class_mapping:
+            raise ValueError("class_mapping порожній. Перевір data/class_mapping.json")
+
+        return {idx: style for style, idx in class_mapping.items()}
+
+    def _load_style_uk_mapping(self) -> Dict[str, str]:
+        path = self.data_dir / "architectural_styles_ukrainian.json"
+
+        if not path.exists():
+            logger.warning("architectural_styles_ukrainian.json not found: %s", path)
             return {}
 
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Підтримка двох форматів:
-        # 1) {"Style name": 0, ...}
-        # 2) {"0": "Style name", ...}
-        if not data:
-            return {}
+        if not isinstance(data, dict):
+            raise ValueError("architectural_styles_ukrainian.json має бути JSON-об'єктом")
 
-        if all(isinstance(v, int) for v in data.values()):
-            return {str(k): int(v) for k, v in data.items()}
-
-        if all(str(k).isdigit() for k in data.keys()):
-            inverted = {str(v): int(k) for k, v in data.items()}
-            return inverted
-
-        raise ValueError("Невідомий формат class_mapping.json")
-
-    def _build_idx_to_class(self, class_mapping: Dict[str, int]) -> Dict[int, str]:
-        if class_mapping:
-            return {idx: style for style, idx in class_mapping.items()}
-
-        # Fallback: якщо mapping відсутній
-        fallback_styles = [
-            "Achaemenid architecture",
-            "American craftsman style",
-            "American Foursquare architecture",
-            "Ancient Egyptian architecture",
-            "Art Deco architecture",
-            "Art Nouveau architecture",
-            "Baroque architecture",
-            "Bauhaus architecture",
-            "Beaux-Arts architecture",
-            "Byzantine architecture",
-            "Chicago school architecture",
-            "Colonial architecture",
-            "Deconstructivism",
-            "Edwardian architecture",
-            "Georgian architecture",
-            "Gothic architecture",
-            "Greek Revival architecture",
-            "International style",
-            "Novelty architecture",
-            "Palladian architecture",
-            "Postmodern architecture",
-            "Queen Anne architecture",
-            "Romanesque architecture",
-            "Russian Revival architecture",
-            "Tudor Revival architecture",
-        ]
-        return {i: style for i, style in enumerate(fallback_styles)}
-
-    def _build_style_uk_mapping(self) -> Dict[str, str]:
-        return {
-            "Achaemenid architecture": "Ахеменідська архітектура",
-            "American craftsman style": "Американський ремісничий стиль",
-            "American Foursquare architecture": "Американська чотирикутна архітектура",
-            "Ancient Egyptian architecture": "Давньоєгипетська архітектура",
-            "Art Deco architecture": "Ар-деко",
-            "Art Nouveau architecture": "Архітектура модерн",
-            "Baroque architecture": "Бароко",
-            "Bauhaus architecture": "Баухаус",
-            "Beaux-Arts architecture": "Боз-Ар",
-            "Byzantine architecture": "Візантійська архітектура",
-            "Chicago school architecture": "Чиказька школа архітектури",
-            "Colonial architecture": "Колоніальна архітектура",
-            "Deconstructivism": "Деконструктивізм",
-            "Edwardian architecture": "Едвардіанська архітектура",
-            "Georgian architecture": "Георгіанська архітектура",
-            "Gothic architecture": "Готика",
-            "Greek Revival architecture": "Грецьке відродження",
-            "International style": "Інтернаціональний стиль",
-            "Novelty architecture": "Новаторська архітектура",
-            "Palladian architecture": "Палладіанська архітектура",
-            "Postmodern architecture": "Постмодернізм",
-            "Queen Anne architecture": "Архітектура королеви Анни",
-            "Romanesque architecture": "Романський стиль",
-            "Russian Revival architecture": "Російське відродження",
-            "Tudor Revival architecture": "Тюдорівське відродження",
-        }
+        return {str(style): str(style_uk) for style, style_uk in data.items()}
 
     def _load_geographical_data(self) -> Dict[str, Any]:
         path = self.data_dir / "architectural_styles_geography.json"
         if not path.exists():
-            logger.warning("Geography JSON not found: %s", path)
+            logger.warning("architectural_styles_geography.json not found: %s", path)
             return {}
 
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Підтримка обох форматів (з обгорткою і без)
-        if "architectural_styles" in data:
-            return data["architectural_styles"]
+        if not isinstance(data, dict):
+            raise ValueError("architectural_styles_geography.json має бути JSON-об'єктом")
         return data
 
     def _load_ukrainian_geo_translations(self) -> Dict[str, Dict[str, str]]:
@@ -177,13 +126,7 @@ class ArchVisionAnalyzer:
 
     # Model loading
     def _checkpoint_candidates(self, model_type: str) -> List[Path]:
-        candidates = [self.checkpoints_dir / f"{model_type}_best.pth"]
-
-        # legacy fast_model.pth для efficientnet
-        if model_type == ModelType.EFFICIENTNET_B0.value:
-            candidates.append(self.data_dir / "fast_model.pth")
-
-        return candidates
+        return [self.checkpoints_dir / f"{model_type}_best.pth"]
 
     def ensure_model_loaded(self, model_type: str) -> bool:
         if model_type in self.models:
@@ -196,7 +139,11 @@ class ArchVisionAnalyzer:
             return False
 
         cfg = MODEL_CONFIGS[model_enum]
-        model = build_model(model_enum, num_classes=len(self.idx_to_class))
+
+        model = build_model(
+            model_enum,
+            num_classes=len(self.idx_to_class),
+        )
         transform = build_transform(cfg.input_size)
 
         model_loaded = False
@@ -213,21 +160,25 @@ class ArchVisionAnalyzer:
                 break
             except Exception as e:
                 last_error = str(e)
-                logger.warning("Failed to load checkpoint %s for %s: %s", ckpt, model_type, e)
+                logger.warning(
+                    "Failed to load checkpoint %s for %s: %s",
+                    ckpt,
+                    model_type,
+                    e,
+                )
 
-        # Навіть якщо ваги не завантажилися — модель створюємо (для структури/демо)
+        if not model_loaded:
+            msg = last_error or f"Checkpoint не знайдено для {model_type}"
+            self.model_load_errors[model_type] = msg
+            logger.error("%s: %s", model_type, msg)
+            return False
+
         model.to(self.device)
         model.eval()
 
         self.models[model_type] = model
         self.transforms[model_type] = transform
-
-        if not model_loaded:
-            msg = last_error or "Checkpoint не знайдено (модель створена без натренованих ваг)"
-            self.model_load_errors[model_type] = msg
-            logger.warning("%s: %s", model_type, msg)
-        else:
-            self.model_load_errors.pop(model_type, None)
+        self.model_load_errors.pop(model_type, None)
 
         return True
 
@@ -238,16 +189,24 @@ class ArchVisionAnalyzer:
         return image
 
     def _predict_probs(self, image: Image.Image, model_type: str) -> np.ndarray:
-        self.ensure_model_loaded(model_type)
+        if not self.ensure_model_loaded(model_type):
+            raise RuntimeError(
+                self.model_load_errors.get(
+                    model_type,
+                    f"Модель {model_type} не завантажена",
+                )
+            )
 
         model = self.models[model_type]
         transform = self.transforms[model_type]
         image = self._prepare_image(image)
 
         tensor = transform(image).unsqueeze(0).to(self.device)
+
         with torch.no_grad():
             logits = model(tensor)
             probs = F.softmax(logits, dim=1).squeeze(0).detach().cpu().numpy()
+
         return probs
 
     def _generate_tta_images(self, image: Image.Image) -> List[Image.Image]:
@@ -311,7 +270,6 @@ class ArchVisionAnalyzer:
         model_name = MODEL_CONFIGS[ModelType(model_type)].name
         style_result = self._format_style_result(probs, model_name + (" + TTA" if use_tta else ""), tta_used=use_tta)
 
-        # Якщо модель без ваг — явно підсвітимо це
         if model_type in self.model_load_errors:
             style_result["warning"] = self.model_load_errors[model_type]
 
@@ -388,38 +346,57 @@ class ArchVisionAnalyzer:
         }
 
     # Public API
-    async def analyze_full(self, image: Image.Image, use_tta: bool = False, model_type: str = "efficientnet_b0") -> Dict[str, Any]:
+    async def analyze_full(
+        self,
+        image: Image.Image,
+        use_tta: bool = False,
+        model_type: str = "efficientnet_b0",
+        include_gemini: bool = False,
+    ) -> Dict[str, Any]:
         try:
             if model_type == "ensemble":
                 architectural_style = self._analyze_ensemble(image, use_tta=use_tta)
             else:
-                architectural_style = self._analyze_single_model(image, model_type=model_type, use_tta=use_tta)
+                architectural_style = self._analyze_single_model(
+                    image,
+                    model_type=model_type,
+                    use_tta=use_tta,
+                )
 
-            gemini_result = await self._analyze_with_gemini(image)
-            #gemini_analysis = await self._analyze_with_gemini_placeholder(image, architectural_style)
-
-            return {
-                "gemini_analysis": gemini_result,
+            result = {
                 "architectural_style": architectural_style,
                 "supported_styles": self.architectural_styles,
                 "style_mapping": self.style_mapping,
                 "geographical_data": architectural_style.get("geographical_data", {}),
-                #"verification": {
-                    #"overall_quality": "good" if not gemini_analysis.get("error") else "partial",
-                    #"consistency_score": 0.85 if not gemini_analysis.get("error") else 0.5,
-                #},
             }
+
+            if include_gemini:
+                result["gemini_analysis"] = await self._analyze_with_gemini(image)
+
+            return result
 
         except Exception as e:
             logger.exception("Full analysis error")
             return {
                 "error": f"Помилка аналізу: {str(e)}",
                 "architectural_style": {
-                    "top_prediction": {"style": "Невідомо", "style_uk": "Невідомо", "confidence": 0.0},
+                    "top_prediction": {
+                        "style": "Невідомо",
+                        "style_uk": "Невідомо",
+                        "confidence": 0.0,
+                    },
                     "all_predictions": [],
                     "geographical_data": {"regions": [], "famous_buildings": []},
-                },
-                "verification": {"overall_quality": "poor", "consistency_score": 0.0},
+                }
+            }
+            
+    async def analyze_gemini_only(self, image: Image.Image) -> Dict[str, Any]:
+        try:
+            return await self._analyze_with_gemini(image)
+        except Exception as e:
+            logger.exception("Gemini-only analysis error")
+            return {
+                "error": f"Помилка Gemini: {str(e)}",
             }
             
     def _get_next_gemini_key(self):
@@ -437,13 +414,16 @@ class ArchVisionAnalyzer:
             api_key = self._get_next_gemini_key()
             self.gemini_client = genai.Client(api_key=api_key)
             self._gemini_ready = True
-        except Exception:
+        except Exception as e:
             self._gemini_ready = False
+            logger.warning("Failed to initialize Gemini: %s", e)
 
     async def _analyze_with_gemini(self, image):
-        
         if not self._gemini_ready:
-            return {"error": "Gemini недоступний (нема ключа або помилка ініціалізації)"}
+            return {
+                "error": "Gemini тимчасово недоступний. Перевірте API-ключ у .env.",
+                "technical_error": "Gemini client is not initialized",
+            }
 
         prompt = (
             """Відповідай українською мовою. Будь точним та інформативним.
@@ -456,16 +436,20 @@ class ArchVisionAnalyzer:
             3. **Місцезнаходження:** Вкажи місто, країну та по можливості адресу
             4. **Архітектор:** Якщо відомо, вкажи ім'я архітектора
             5. **Рік будівництва:** Коли була побудована будівля
-            6. **Ключові архітектурні елементи:** Опиши характерні деталі (колони, арки, орнаменти, вікна, дах тощо)"
+            6. **Ключові архітектурні елементи:** Опиши характерні деталі (колони, арки, орнаменти, вікна, дах тощо)
             7. **Історична цінність:** Чому ця будівля важлива
             8. **Сучасне використання:** Як використовується будівля зараз"""
         )
 
-        for attempt in range(max(1, len(self.gemini_keys))):
+        max_attempts = max(3, len(self.gemini_keys) * 2)
+        last_error = ""
+
+        for attempt in range(max_attempts):
             try:
-                if attempt > 0:
+                if attempt > 0 and self.gemini_keys:
                     api_key = self._get_next_gemini_key()
-                    self.gemini_client = genai.Client(api_key=api_key)
+                    if api_key:
+                        self.gemini_client = genai.Client(api_key=api_key)
 
                 def _call():
                     return self.gemini_client.models.generate_content(
@@ -477,54 +461,61 @@ class ArchVisionAnalyzer:
 
                 analysis = getattr(response, "text", None)
                 if not analysis:
-                    # fallback: дістаємо текст із candidates/parts
                     try:
                         analysis = response.candidates[0].content.parts[0].text
                     except Exception:
                         analysis = ""
 
                 analysis = (analysis or "").strip()
-                
-                logger.info(f"Gemini text length: {len(analysis)}")
-                logger.info(f"Gemini preview: {analysis[:150]}")
+
+                logger.info("Gemini text length: %s", len(analysis))
+                logger.info("Gemini preview: %s", analysis[:150])
 
                 if not analysis:
-                    # що прийшло, але тексту нема
-                    return {"error": "Gemini повернув порожній текст", "raw": str(response)}
+                    return {
+                        "error": "Gemini повернув порожню відповідь. Спробуйте ще раз.",
+                        "technical_error": str(response),
+                    }
 
                 return {
                     "analysis": analysis,
                     "description": analysis,
                     "summary": analysis,
                     "confidence": 0.85,
-                    "model": "gemini-2.5-flash",
+                    "model": self.gemini_model,
                 }
+
             except Exception as e:
-                if attempt == len(self.gemini_keys) - 1:
-                    return {"error": f"Помилка Gemini: {str(e)}"}
+                last_error = str(e)
+                logger.warning(
+                    "Gemini attempt %s/%s failed: %s",
+                    attempt + 1,
+                    max_attempts,
+                    last_error,
+                )
 
-        return {"error": "Помилка Gemini"}
+                is_temporary_error = any(
+                    marker in last_error
+                    for marker in (
+                        "503",
+                        "UNAVAILABLE",
+                        "high demand",
+                        "429",
+                        "RESOURCE_EXHAUSTED",
+                        "temporarily",
+                    )
+                )
 
-    async def _analyze_with_gemini_placeholder(self, image: Image.Image, style_result: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Поки що без реального Gemini-виклику (щоб проект стабільно запускався без API ключів).
-        Потім можна легко замінити на реальний SDK-виклик.
-        """
-        top = style_result.get("top_prediction", {})
-        style_name = top.get("style_uk") or top.get("style") or "Невідомо"
+                if is_temporary_error and attempt < max_attempts - 1:
+                    await asyncio.sleep(min(8, 1.5 * (attempt + 1)))
+                    continue
 
-        if not self.gemini_keys:
-            return {
-                "error": "Gemini API ключ не налаштований",
-                "summary": f"Ймовірний стиль: {style_name}. Детальний AI-опис тимчасово вимкнений.",
-                "architectural_features": [],
-                "historical_context": "",
-                "cultural_significance": "",
-            }
+                return {
+                    "error": "Ви дійшли до ліміту аналізів від Gemini. Розширений опис можна спробувати здійснити ще раз завтра",
+                    "technical_error": last_error,
+                }
 
         return {
-            "summary": f"Визначено стиль: {style_name}. Gemini інтеграція підключена, але в цьому етапі дипломного проєкту використовується заглушка.",
-            "architectural_features": [],
-            "historical_context": "",
-            "cultural_significance": "",
+            "error": "Gemini тимчасово недоступний. Спробуйте ще раз пізніше.",
+            "technical_error": last_error,
         }

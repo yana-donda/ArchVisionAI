@@ -219,14 +219,14 @@
       {"name": "Speyer Cathedral", "coordinates": [49.3173, 8.4411], "description": "Largest Romanesque church"}
     ]
   },
-  "Russian Revival architecture": {
+  "Neo-Byzantine Revival architecture": {
     "regions": [
-      {"name": "Moscow, Russia", "center": [55.7558, 37.6173], "radius_km": 200, "description": "Russian Orthodox churches"},
-      {"name": "Saint Petersburg, Russia", "center": [59.9311, 30.3609], "radius_km": 100, "description": "Imperial Russian"}
+      {"name": "Eastern Europe", "center": [49.0, 31.0], "radius_km": 800, "description": "Neo-Byzantine revival architecture"},
+      {"name": "Balkan region", "center": [42.7, 23.3], "radius_km": 400, "description": "Neo-Byzantine churches"}
     ],
     "buildings": [
-      {"name": "Saint Basil's Cathedral", "coordinates": [55.7525, 37.6231], "description": "Iconic Russian landmark"},
-      {"name": "Church of the Savior on Blood", "coordinates": [59.9400, 30.3289], "description": "Russian Revival church"}
+      {"name": "St. Volodymyr's Cathedral", "coordinates": [50.4449, 30.5089], "description": "Neo-Byzantine Revival landmark"},
+      {"name": "Alexander Nevsky Cathedral", "coordinates": [42.6960, 23.3320], "description": "Neo-Byzantine cathedral"}
     ]
   },
   "Tudor Revival architecture": {

@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
-import os
-from datetime import datetime
+import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote
 
 from PIL import Image
 from flask import Request
@@ -35,14 +35,24 @@ class AnalysisService:
         return True, "Режим оновлено"
 
     def get_model_info(self, model_type: str) -> Optional[Dict[str, Any]]:
+        def format_params(value: float) -> str:
+            return f"{round(float(value), 1):g}M"
+
         if model_type == "ensemble":
+            params = (
+                MODEL_CONFIGS[ModelType.EFFICIENTNET_B0].params_millions
+                + MODEL_CONFIGS[ModelType.RESNET50].params_millions
+            )
+
             return {
                 "type": "ensemble",
-                "name": "Ensemble (EfficientNet-B0 + ResNet-50)",
-                "params_millions": MODEL_CONFIGS[ModelType.EFFICIENTNET_B0].params_millions + MODEL_CONFIGS[ModelType.RESNET50].params_millions,
+                "name": "Ensemble",
+                "full_name": "Ensemble (EfficientNet-B0 + ResNet-50)",
+                "params_millions": round(params, 1),
+                "params": f"{MODEL_CONFIGS[ModelType.RESNET50].params_millions}M + {MODEL_CONFIGS[ModelType.EFFICIENTNET_B0].params_millions}M",
                 "input_size": 224,
                 "batch_size": 16,
-                "description": "Усереднення ймовірностей двох моделей",
+                "description": "Усереднення ймовірностей EfficientNet-B0 та ResNet-50 для стабільнішого результату",
             }
 
         try:
@@ -50,7 +60,9 @@ class AnalysisService:
             return {
                 "type": cfg.type.value,
                 "name": cfg.name,
-                "params_millions": cfg.params_millions,
+                "full_name": cfg.name,
+                "params_millions": round(float(cfg.params_millions), 1),
+                "params": format_params(cfg.params_millions),
                 "input_size": cfg.input_size,
                 "batch_size": cfg.recommended_batch_size,
                 "description": cfg.description,
@@ -64,50 +76,6 @@ class AnalysisService:
             self.get_model_info("resnet50"),
             self.get_model_info("ensemble"),
         ]
-
-    def list_checkpoints(self) -> List[Dict[str, Any]]:
-        items = []
-        checkpoint_dir = self.base_dir / "checkpoints"
-        if checkpoint_dir.exists():
-            for p in checkpoint_dir.glob("*.pth"):
-                stat = p.stat()
-                items.append(
-                    {
-                        "name": p.name,
-                        "path": str(p),
-                        "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                        "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                    }
-                )
-        items.sort(key=lambda x: x["name"])
-        return items
-
-    def get_trained_models(self) -> List[Dict[str, Any]]:
-        out = []
-        for ck in self.list_checkpoints():
-            if not ck["name"].endswith("_best.pth"):
-                continue
-
-            model_type = ck["name"].replace("_best.pth", "")
-            info = self.get_model_info(model_type) or {
-                "type": model_type,
-                "name": model_type,
-                "params_millions": 0.0,
-                "input_size": 224,
-                "batch_size": 16,
-                "description": "Натренована модель",
-            }
-
-            out.append(
-                {
-                    **info,
-                    "file_size_mb": ck["size_mb"],
-                    "trained_date": ck["modified"].replace("T", " ")[:16],
-                    "checkpoint_path": ck["path"],
-                }
-            )
-
-        return out
 
     # ------------------------------
     # Request parsing / analysis
@@ -159,11 +127,16 @@ class AnalysisService:
             finally:
                 loop.close()
 
-    def analyze_request(self, request: Request, mode_override: Optional[str] = None) -> Dict[str, Any]:
+    def analyze_request(
+        self,
+        request: Request,
+        mode_override: Optional[str] = None,
+        include_gemini: bool = False,
+    ) -> Dict[str, Any]:
         image, json_data, image_name = self._read_image_from_request(request)
         use_tta = bool(json_data.get("use_tta", False))
 
-        model_type = mode_override or json_data.get("model_type") or self.current_mode
+        model_type = json_data.get("model_type") or mode_override or self.current_mode
         if model_type not in {"efficientnet_b0", "resnet50", "ensemble"}:
             model_type = self.current_mode
 
@@ -172,6 +145,7 @@ class AnalysisService:
                 image=image,
                 use_tta=use_tta,
                 model_type=model_type,
+                include_gemini=include_gemini,
             )
         )
 
@@ -182,44 +156,49 @@ class AnalysisService:
             "model_type": model_type,
         }
         return result
+    
+    def analyze_gemini_request(self, request: Request) -> Dict[str, Any]:
+        image, _, _ = self._read_image_from_request(request)
+
+        gemini_result = self._run_async(
+            self.analyzer.analyze_gemini_only(image)
+        )
+
+        return {
+            "gemini_analysis": gemini_result,
+        }
 
     # ------------------------------
     # Dataset images for background
     # ------------------------------
     def get_dataset_images(self, limit: int = 20) -> List[str]:
-        import random
+        dataset_dir = self.base_dir / "dataset"
+        image_extensions = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
-        images: List[str] = []
-        dataset_paths = [self.base_dir / "dataset", self.base_dir / "dataset" / "dataset"]
+        if not dataset_dir.exists():
+            return []
 
-        for base_path in dataset_paths:
-            if not base_path.exists():
-                continue
+        images = []
 
-            for style_dir in base_path.iterdir():
-                if not style_dir.is_dir():
-                    continue
-
-                for f in style_dir.iterdir():
-                    if f.suffix.lower() in {".jpg", ".jpeg", ".png"}:
-                        rel = f.relative_to(base_path).as_posix()
-                        images.append(f"/api/dataset/image/{rel}")
-                        if len(images) >= 100:
-                            break
-                if len(images) >= 100:
-                    break
-            if len(images) >= 100:
-                break
+        for image_path in dataset_dir.iterdir():
+            if image_path.is_file() and image_path.suffix.lower() in image_extensions:
+                rel_path = image_path.relative_to(dataset_dir).as_posix()
+                images.append(f"/api/dataset/image/{quote(rel_path)}")
 
         random.shuffle(images)
         return images[:limit]
 
     def resolve_dataset_image(self, filepath: str) -> Optional[Tuple[str, str]]:
-        """
-        Returns (directory, filename) or None
-        """
-        for base_path in [self.base_dir / "dataset", self.base_dir / "dataset" / "dataset"]:
-            full_path = base_path / filepath
-            if full_path.exists() and full_path.is_file():
-                return str(full_path.parent), full_path.name
-        return None
+        dataset_dir = (self.base_dir / "dataset").resolve()
+        safe_path = filepath.replace("\\", "/").lstrip("/")
+        full_path = (dataset_dir / safe_path).resolve()
+
+        try:
+            full_path.relative_to(dataset_dir)
+        except ValueError:
+            return None
+
+        if not full_path.exists() or not full_path.is_file():
+            return None
+
+        return str(full_path.parent), full_path.name

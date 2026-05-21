@@ -1,8 +1,7 @@
-// ui.js
+let availableModels = [];
+let modelInfo = {};
 
-// ==============================
 // Модалки
-// ==============================
 function openModal(modalId) {
     var modal = document.getElementById(modalId);
     if (modal) modal.style.display = 'block';
@@ -19,18 +18,17 @@ function switchModal(currentModal, targetModal) {
 }
 
 // Закриття модалок по кліку поза ними
-window.onclick = function (event) {
+window.addEventListener('click', function (event) {
     var modals = document.querySelectorAll('.modal');
+
     modals.forEach(function (modal) {
         if (event.target === modal) {
             modal.style.display = 'none';
         }
     });
-};
+});
 
-// ==============================
 // Background images
-// ==============================
 async function loadBackgroundImages() {
     try {
         const response = await fetch('/api/dataset/images');
@@ -54,11 +52,16 @@ async function loadBackgroundImages() {
     }
 }
 
-// ==============================
 // Карта
-// ==============================
 function initMap() {
     if (architecturalMap) return;
+
+    const mapElement = document.getElementById('architecturalMap');
+
+    if (!mapElement || typeof L === 'undefined') {
+        console.warn('Map element or Leaflet is not available');
+        return;
+    }
 
     architecturalMap = L.map('architecturalMap').setView([40, 0], 2);
 
@@ -83,12 +86,7 @@ async function addStyleToMap(styleName, styleLabelUk) {
         const trResp = await fetch('/models/architectural_geography_ukrainian.json?v=1');
         const tr = await trResp.json();
 
-        let styleData = null;
-        if (geoData.architectural_styles && geoData.architectural_styles[styleName]) {
-            styleData = geoData.architectural_styles[styleName];
-        } else if (geoData[styleName]) {
-            styleData = geoData[styleName];
-        }
+        const styleData = geoData[styleName] || null;
 
         if (styleData) {
             // Center map on style region
@@ -121,10 +119,10 @@ async function addStyleToMap(styleName, styleLabelUk) {
                     }).addTo(architecturalMap);
 
                     circle.bindPopup(`
-                        <div style="text-align: center; padding: 10px;">
-                            <h4 style="color: var(--teal); margin: 0 0 5px 0;">${(tr.regions && tr.regions[region.name]) || region.name}</h4>
-                            <p style="margin: 5px 0;"><strong>Стиль:</strong> ${styleLabelUk || styleName}</p>
-                            <p style="margin: 5px 0;">${(tr.descriptions && tr.descriptions[region.description]) || region.description}</p>
+                        <div class="map-popup">
+                            <h4 class="map-popup-title">${(tr.regions && tr.regions[region.name]) || region.name}</h4>
+                            <p class="map-popup-text"><strong>Стиль:</strong> ${styleLabelUk || styleName}</p>
+                            <p class="map-popup-text">${(tr.descriptions && tr.descriptions[region.description]) || region.description}</p>
                         </div>
                     `);
 
@@ -158,27 +156,21 @@ async function addStyleToMap(styleName, styleLabelUk) {
 
                     const marker = L.marker([lat, lng], {
                         icon: L.icon({
-                            iconUrl: 'https://cdn-icons-png.flaticon.com/32/684/684908.png',
+                            iconUrl: '/static/icons/location_pin.png',
                             iconSize: [25, 25]
                         })
                     }).addTo(architecturalMap);
 
                     marker.bindPopup(`
-                        <div style="text-align: center; padding: 10px;">
-                            <h4 style="color: var(--teal); margin: 0 0 5px 0;">${(tr.buildings && tr.buildings[building.name]) || building.name}</h4>
-                            <p style="margin: 5px 0;"><strong>Стиль:</strong> ${styleLabelUk || styleName}</p>
-                            <p style="margin: 5px 0;">${(tr.building_descriptions && tr.building_descriptions[building.description]) || building.description}</p>
+                        <div class="map-popup">
+                            <h4 class="map-popup-title">${(tr.buildings && tr.buildings[building.name]) || building.name}</h4>
+                            <p class="map-popup-text"><strong>Стиль:</strong> ${styleLabelUk || styleName}</p>
+                            <p class="map-popup-text">${(tr.building_descriptions && tr.building_descriptions[building.description]) || building.description}</p>
                         </div>
                     `);
 
                     currentStyleLayers.push(marker);
                 });
-            }
-
-            // Якщо юзер залогінений — оновити історію
-            const userBlocks = document.getElementById('userBlocks');
-            if (userBlocks && userBlocks.style.display === 'flex' && typeof loadUserHistory === 'function') {
-                loadUserHistory();
             }
         }
     } catch (error) {
@@ -186,71 +178,102 @@ async function addStyleToMap(styleName, styleLabelUk) {
     }
 }
 
-function getMarkerColor(style) {
-    const colors = {
-        'Gothic': '#8B4513',
-        'Baroque': '#DAA520',
-        'Modern': '#4682B4',
-        'Byzantine': '#800080',
-        'Renaissance': '#FF4500',
-        'Neo-Classical': '#2E8B57',
-        'Medieval': '#556B2F',
-        'Armenian': '#DC143C'
-    };
-    return colors[style] || '#666666';
-}
-
-// ==============================
 // Model Zoo
-// ==============================
-const modelInfo = {
-    'efficientnet_b0': {
-        name: 'EfficientNet-B0',
-        params: '5.3M',
-        input_size: 224,
-        batch_size: 32,
-        accuracy: '74.93%',
-        description: 'Швидка та точна модель, оптимальний баланс'
-    },
-    'resnet50': {
-        name: 'ResNet-50',
-        params: '25.6M',
-        input_size: 224,
-        batch_size: 24,
-        accuracy: '74.93%',
-        description: 'Класична архітектура, стабільна точність'
-    },
-    'ensemble': {
-        name: 'Ensemble',
-        params: '30.9M',
-        input_size: 224,
-        batch_size: 16,
-        accuracy: '~75%',
-        description: 'Комбінація обох моделей для вищої точності'
-    }
-};
+async function initModelZoo() {
+    try {
+        const response = await fetch('/api/models/available');
+        const data = await response.json();
 
-function initModelZoo() {
-    populateModelSelector();
+        if (!response.ok || !data.available) {
+            throw new Error(data.message || 'Моделі недоступні');
+        }
+
+        availableModels = (data.models || []).filter(Boolean);
+        modelInfo = {};
+
+        availableModels.forEach(function (model) {
+            modelInfo[model.type] = model;
+        });
+
+        renderModelOptions(data.current_model || 'efficientnet_b0');
+        updateModelZooStatus(true, data.count || availableModels.length);
+        updateModelInfo(modelInfo[data.current_model] || modelInfo.efficientnet_b0 || availableModels[0]);
+    } catch (error) {
+        console.error('Failed to load model zoo:', error);
+        updateModelZooStatus(false, 'Недоступно');
+    }
 }
 
-function populateModelSelector() {
-    updateModelZooStatus(true, 3);
-    updateModelInfo(modelInfo['efficientnet_b0']);
+function renderModelOptions(currentModel) {
+    const selector = document.getElementById('modelSelector');
+    if (!selector) return;
+
+    selector.innerHTML = '';
+
+    const group = document.createElement('optgroup');
+    group.label = 'Режим аналізу';
+
+    availableModels.forEach(function (model) {
+        const option = document.createElement('option');
+        option.value = model.type;
+        option.textContent = model.name;
+        option.selected = model.type === currentModel;
+        group.appendChild(option);
+    });
+
+    selector.appendChild(group);
+}
+
+function formatModelParams(model) {
+    if (!model) return '—';
+
+    if (model.params) {
+        return model.params;
+    }
+
+    const value = Number(model.params_millions);
+    if (!Number.isFinite(value)) {
+        return '—';
+    }
+
+    return `${Math.round(value * 10) / 10}M`;
+}
+
+function formatInputSize(model) {
+    const inputSize = Number(model?.input_size || 224);
+    return `${inputSize}×${inputSize}`;
 }
 
 function updateModelInfo(model) {
+    if (!model) return;
+
     const modelParams = document.getElementById('modelParams');
     const modelInputSize = document.getElementById('modelInputSize');
     const modelBatchSize = document.getElementById('modelBatchSize');
     const modelDescription = document.getElementById('modelDescription');
     const currentModelName = document.getElementById('currentModelName');
 
-    if (modelParams) modelParams.textContent = model.params || '?';
-    if (modelInputSize) modelInputSize.textContent = `${model.input_size || 224}x${model.input_size || 224}`;
-    if (modelBatchSize) modelBatchSize.textContent = model.batch_size || 32;
-    if (modelDescription) modelDescription.textContent = model.description || 'Немає опису';
-    if (currentModelName) currentModelName.textContent = model.name || 'Model';
+    const displayName = model.full_name || model.name || model.type || 'Модель';
+
+    if (modelParams) {
+        modelParams.textContent = formatModelParams(model);
+    }
+
+    if (modelInputSize) {
+        modelInputSize.textContent = formatInputSize(model);
+    }
+
+    if (modelBatchSize) {
+        modelBatchSize.textContent = model.batch_size || '—';
+    }
+
+    if (modelDescription) {
+        modelDescription.textContent = model.description || 'Опис недоступний';
+    }
+
+    if (currentModelName) {
+        currentModelName.textContent = displayName;
+    }
 }
 
 function updateModelZooStatus(available, countOrMessage) {
@@ -294,18 +317,23 @@ async function onModelChange() {
 
         if (data.success) {
             console.log('Model switched to:', selectedType);
-            showModelNotification(`Режим: ${model?.name || selectedType}`);
+            showAppMessage(`Режим: ${model?.name || selectedType}`, 'success');
         } else {
             console.warn('Failed to switch model:', data.message);
-            showModelNotification(data.message || 'Помилка перемикання', true);
+            showAppMessage(data.message || 'Помилка перемикання', 'error');
         }
     } catch (error) {
         console.error('Error switching model:', error);
-        showModelNotification('Помилка перемикання моделі', true);
+        showAppMessage('Помилка перемикання моделі', 'error');
     }
 }
 
 function setAnalysisMode(mode) {
+    if (!['standard', 'tta'].includes(mode)) {
+        console.warn('Unknown analysis mode:', mode);
+        return;
+    }
+
     currentAnalysisMode = mode;
 
     document.querySelectorAll('.analysis-option-btn').forEach(function (btn) {
@@ -319,47 +347,51 @@ function setAnalysisMode(mode) {
     console.log('Analysis mode set to:', mode);
 }
 
-function showModelNotification(message, isError) {
+function showAppMessage(message, type = 'success') {
+    const oldToast = document.getElementById('appMessageToast');
+    if (oldToast) {
+        oldToast.remove();
+    }
+
     const toast = document.createElement('div');
+    toast.id = 'appMessageToast';
+
+    const isError = type === 'error';
+
     toast.style.cssText = `
         position: fixed;
-        bottom: 20px;
         right: 20px;
+        bottom: 20px;
+        max-width: 360px;
         padding: 15px 25px;
+        border-radius: 12px;
         background: ${isError ? '#dc3545' : '#28a745'};
-        color: white;
-        border-radius: 8px;
-        font-weight: bold;
-        z-index: 9999;
-        animation: slideIn 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        color: #fff;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+        z-index: 10000;
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.4;
+        text-align: center;
+        opacity: 1;
+        transform: translateX(0);
+        transition: opacity 0.25s ease, transform 0.25s ease;
     `;
+
     toast.textContent = message;
     document.body.appendChild(toast);
 
     setTimeout(function () {
-        toast.style.animation = 'slideOut 0.3s ease';
-        setTimeout(function () { toast.remove(); }, 300);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(20px)';
+
+        setTimeout(function () {
+            toast.remove();
+        }, 250);
     }, 3000);
 }
 
-// CSS анімації для toast
-(function injectToastAnimations() {
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-    `;
-    document.head.appendChild(style);
-})();
-
-// На всякий випадок явно експортуємо в window (для inline onclick)
+window.showAppMessage = showAppMessage;
 window.openModal = openModal;
 window.closeModal = closeModal;
 window.switchModal = switchModal;

@@ -9,16 +9,16 @@ function bindUploadEvents() {
 
     uploadArea.addEventListener('dragover', function (e) {
         e.preventDefault();
-        uploadArea.style.borderColor = '#379683';
+        uploadArea.classList.add('dragover');
     });
 
     uploadArea.addEventListener('dragleave', function () {
-        uploadArea.style.borderColor = '#7395AE';
+        uploadArea.classList.remove('dragover');
     });
 
     uploadArea.addEventListener('drop', function (e) {
         e.preventDefault();
-        uploadArea.style.borderColor = '#7395AE';
+        uploadArea.classList.remove('dragover');
 
         const files = e.dataTransfer.files;
         if (files.length > 0) {
@@ -47,12 +47,45 @@ function selectFile() {
 }
 
 function handleImageUpload(file) {
-    if (!file.type.startsWith('image/')) {
-        alert('Оберіть файл зображення');
+    const maxSizeMb = 15;
+    const maxSizeBytes = maxSizeMb * 1024 * 1024;
+
+    function notify(message, type) {
+        if (typeof showAppMessage === 'function') {
+            showAppMessage(message, type || 'error');
+        } else if (results) {
+            results.innerHTML = `<div class="results">${message}</div>`;
+        } else {
+            console.warn(message);
+        }
+    }
+
+    if (!file || !file.type.startsWith('image/')) {
+        notify('Оберіть файл зображення.', 'error');
+        return;
+    }
+
+    if (file.size > maxSizeBytes) {
+        selectedImage = null;
+
+        if (imageInput) {
+            imageInput.value = '';
+        }
+
+        if (imagePreview) {
+            imagePreview.innerHTML = '';
+        }
+
+        if (analyzeBtn) {
+            analyzeBtn.disabled = true;
+        }
+
+        notify(`Файл занадто великий. Максимальний розмір — ${maxSizeMb} МБ.`, 'error');
         return;
     }
 
     const reader = new FileReader();
+
     reader.onload = function (e) {
         selectedImage = e.target.result;
 
@@ -63,49 +96,181 @@ function handleImageUpload(file) {
         if (analyzeBtn) {
             analyzeBtn.disabled = false;
         }
+
+        if (results) {
+            results.innerHTML = '';
+        }
+    };
+
+    reader.onerror = function () {
+        selectedImage = null;
+
+        if (analyzeBtn) {
+            analyzeBtn.disabled = true;
+        }
+
+        notify('Не вдалося прочитати файл. Спробуйте вибрати інше зображення.', 'error');
     };
 
     reader.readAsDataURL(file);
+}
+
+function isAuthenticatedUser() {
+    const userBlocks = document.getElementById('userBlocks');
+    return Boolean(userBlocks && userBlocks.style.display !== 'none');
+}
+
+function normalizeGeminiError(errorText) {
+    if (!errorText) return '';
+
+    const text = String(errorText);
+
+    if (
+        text.includes('503') ||
+        text.includes('UNAVAILABLE') ||
+        text.includes('high demand') ||
+        text.includes('Service Unavailable')
+    ) {
+        return 'Gemini тимчасово перевантажений. Локальний аналіз архітектурного стилю вже виконано. Спробуйте розширений AI-опис ще раз через кілька хвилин.';
+    }
+
+    if (
+        text.includes('429') ||
+        text.includes('RESOURCE_EXHAUSTED') ||
+        text.includes('quota')
+    ) {
+        return 'Ліміт Gemini API тимчасово вичерпано. Локальний аналіз стилю виконано, але розширений AI-опис зараз недоступний.';
+    }
+
+    return text;
+}
+
+function extractGeminiText(data) {
+    const result = data.data || data;
+    const gemini = result.gemini_analysis || {};
+
+    return (
+        gemini.analysis ||
+        gemini.description ||
+        gemini.summary ||
+        gemini.historical_context ||
+        result.ai_analysis ||
+        normalizeGeminiError(gemini.error) ||
+        ''
+    );
+}
+
+async function runGeminiAnalysis(baseBody, historyId) {
+    if (typeof updateGeminiBlock === 'function') {
+        updateGeminiBlock('Gemini AI аналізує зображення. Це може зайняти кілька секунд...');
+    }
+
+    try {
+        const body = {
+            ...baseBody,
+            history_id: historyId || null,
+        };
+
+        const response = await fetch('/api/analyze/gemini', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+            throw new Error(data.error || 'Помилка Gemini');
+        }
+
+        const geminiText = extractGeminiText(data);
+
+        if (geminiText && typeof updateGeminiBlock === 'function') {
+            updateGeminiBlock(geminiText);
+        }
+
+        if (typeof loadUserHistory === 'function') {
+            loadUserHistory();
+        }
+
+    } catch (error) {
+        const message = normalizeGeminiError(error.message);
+
+        if (typeof updateGeminiBlock === 'function') {
+            updateGeminiBlock(`**Статус:** ${message || 'Gemini тимчасово недоступний. Спробуйте пізніше.'}`);
+        }
+
+        console.error('Gemini analysis error:', error);
+    }
 }
 
 async function analyzeImage() {
     if (!selectedImage) return;
 
     if (analyzeBtn) analyzeBtn.disabled = true;
-    if (results) results.innerHTML = '<div class="loading">Аналізую...</div>';
+
+    if (results) {
+        results.innerHTML = '<div class="loading">Визначаю архітектурний стиль...</div>';
+    }
+
+    const body = {
+        image: selectedImage.split(',')[1],
+    };
+
+    if (currentAnalysisMode === 'tta') {
+        body.use_tta = true;
+    }
+
+    const selector = document.getElementById('modelSelector');
+    if (selector) {
+        body.model_type = selector.value;
+    }
 
     try {
-        const body = {
-            image: selectedImage.split(',')[1]
-        };
-
-        // TTA режим
-        if (currentAnalysisMode === 'tta') {
-            body.use_tta = true;
-        }
-
-        // Поточна модель
-        const selector = document.getElementById('modelSelector');
-        if (selector) {
-            body.model_type = selector.value;
-        }
-
         const response = await fetch('/api/analyze', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
         });
 
         const data = await response.json();
+
+        if (!response.ok || data.error) {
+            throw new Error(data.error || 'Помилка аналізу');
+        }
+
         displayResults(data);
+
+        if (typeof loadUserHistory === 'function' && isAuthenticatedUser()) {
+            loadUserHistory();
+        }
+
+        if (typeof loadUserStats === 'function' && isAuthenticatedUser()) {
+            loadUserStats();
+        }
+
+        if (analyzeBtn) analyzeBtn.disabled = false;
+
+        if (isAuthenticatedUser()) {
+            runGeminiAnalysis(body, data.history_id);
+        }
+
     } catch (error) {
         if (results) {
-            results.innerHTML = '<div class="results">Помилка аналізу: ' + error.message + '</div>';
+            const friendlyMessage = typeof normalizeAnalyzeError === 'function'
+                ? normalizeAnalyzeError(error)
+                : (error.message || 'Сталася помилка аналізу.');
+
+            results.innerHTML = `<div class="results">${friendlyMessage}</div>`;
         }
-    } finally {
+
         if (analyzeBtn) analyzeBtn.disabled = false;
+
+        console.error('Analyze error:', error);
     }
 }
 
@@ -148,44 +313,11 @@ function displayResults(data) {
         `;
     }
 
-    // Gemini block (для зареєстрованих)
-    if (result.gemini_analysis && result.gemini_analysis.analysis) {
-        if (typeof updateGeminiBlock === 'function') {
-            updateGeminiBlock(result.gemini_analysis.analysis);
-        }
-    } else if (result.gemini_analysis && result.gemini_analysis.description) {
-        if (typeof updateGeminiBlock === 'function') {
-            updateGeminiBlock(result.gemini_analysis.description);
-        }
-    } else if (result.ai_analysis) {
-        if (typeof updateGeminiBlock === 'function') {
-            updateGeminiBlock(result.ai_analysis);
-        }
-    }
-
     // Карта
     if (originalStyleName && result.architectural_style) {
         if (typeof addStyleToMap === 'function') {
             addStyleToMap(originalStyleName, styleName);
         }
-    }
-
-    if (result.historical_period) {
-        html += `
-            <div class="analysis-section">
-                <div class="section-title">Історичний період:</div>
-                <div>${result.historical_period}</div>
-            </div>
-        `;
-    }
-
-    if (result.cultural_significance) {
-        html += `
-            <div class="analysis-section">
-                <div class="section-title">Культурне значення:</div>
-                <div>${result.cultural_significance}</div>
-            </div>
-        `;
     }
 
     html += '</div>';

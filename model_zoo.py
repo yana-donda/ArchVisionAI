@@ -61,9 +61,12 @@ def build_model(model_type: ModelType, num_classes: Optional[int] = None) -> tor
 
 
 def build_transform(input_size: int = 224) -> transforms.Compose:
+    resize_size = int(input_size * 256 / 224)
+
     return transforms.Compose(
         [
-            transforms.Resize((input_size, input_size)),
+            transforms.Resize(resize_size),
+            transforms.CenterCrop(input_size),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406],

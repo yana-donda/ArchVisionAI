@@ -1,4 +1,3 @@
-// Auth
 async function register(event) {
     event.preventDefault();
 
@@ -30,7 +29,7 @@ async function register(event) {
     } catch (error) {
         const alertEl = document.getElementById('registerAlert');
         if (alertEl) {
-            alertEl.innerHTML = '<div class="alert alert-error">Registration error</div>';
+            alertEl.innerHTML = '<div class="alert alert-error">Помилка реєстрації. Спробуйте ще раз.</div>';
         }
     }
 }
@@ -69,37 +68,26 @@ async function login(event) {
     } catch (error) {
         const alertEl = document.getElementById('loginAlert');
         if (alertEl) {
-            alertEl.innerHTML = '<div class="alert alert-error">Login error</div>';
+            alertEl.innerHTML = '<div class="alert alert-error">Помилка входу. Спробуйте ще раз.</div>';
         }
     }
 }
 
 async function logout() {
     try {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        const response = await fetch('/api/auth/logout', { method: 'POST' });
+
+        if (!response.ok) {
+            throw new Error('Не вдалося виконати вихід');
+        }
+
         updateUserInterface({ logged_in: false });
     } catch (error) {
-        console.log('Logout error:', error);
-    }
-}
+        console.error('Logout error:', error);
 
-async function quickLogin(username, password) {
-    try {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            updateUserInterface({ logged_in: true, username: data.user.username });
-        } else {
-            alert('Помилка входу: ' + data.error);
+        if (typeof showAppMessage === 'function') {
+            showAppMessage('Не вдалося вийти з акаунту. Спробуйте ще раз.', 'error');
         }
-    } catch (error) {
-        alert('Помилка: ' + error.message);
     }
 }
 
@@ -121,73 +109,58 @@ async function checkAuthStatus() {
     }
 }
 
+function resetUserBlocks() {
+    const geminiContent = document.getElementById('geminiContent');
+    const historyContent = document.getElementById('historyContent');
+    const statsContent = document.getElementById('statsContent');
+
+    if (geminiContent) {
+        geminiContent.textContent = 'Виконайте аналіз зображення для отримання розширеного аналізу ШІ';
+    }
+
+    if (historyContent) {
+        historyContent.textContent = 'Ваша історія аналізу буде відображена тут після входу';
+    }
+
+    if (statsContent) {
+        statsContent.textContent = 'Ваша статистика аналізу буде відображена тут';
+    }
+
+    window.userHistoryData = [];
+    window.userStatsData = null;
+}
+
 // User UI blocks
 function updateUserInterface(userData) {
     const guestButtons = document.getElementById('guestButtons');
     const userButtons = document.getElementById('userButtons');
     const welcomeText = document.getElementById('welcomeText');
     const userBlocks = document.getElementById('userBlocks');
-    const quickLoginBlock = document.getElementById('quickLogin');
 
     if (userData && userData.logged_in) {
         if (guestButtons) guestButtons.style.display = 'none';
         if (userButtons) userButtons.style.display = 'flex';
         if (welcomeText) welcomeText.textContent = `Вітаємо, ${userData.username}!`;
-        if (quickLoginBlock) quickLoginBlock.style.display = 'none';
+
+        // блоки Gemini / History / Stats / Styles
         if (userBlocks) userBlocks.style.display = 'flex';
 
-        loadUserHistory();
-        loadUserStats();
+        if (typeof loadUserHistory === 'function') {
+            loadUserHistory();
+        }
+
+        if (typeof loadUserStats === 'function') {
+            loadUserStats();
+        }
     } else {
         if (guestButtons) guestButtons.style.display = 'flex';
         if (userButtons) userButtons.style.display = 'none';
+        if (welcomeText) welcomeText.textContent = '';
+
         if (userBlocks) userBlocks.style.display = 'none';
-        if (quickLoginBlock) quickLoginBlock.style.display = 'flex';
+
+        resetUserBlocks();
     }
-}
-
-function showUserHistory() {
-    loadUserHistory().then(function () {
-        if (window.userHistoryData && window.userHistoryData.length > 0 && architecturalMap) {
-            const content = window.userHistoryData.slice(0, 5).map(function (item) {
-                return `
-                    <div style="margin: 5px 0; padding: 5px; border-bottom: 1px solid #ddd;">
-                        <strong>${item.predicted_style}</strong><br>
-                        <small>${new Date(item.timestamp).toLocaleDateString('uk-UA')} - ${item.confidence}%</small>
-                    </div>
-                `;
-            }).join('');
-
-            L.popup()
-                .setLatLng([49.8397, 24.0297])
-                .setContent(`<div><h4>Історія аналізів</h4>${content}</div>`)
-                .openOn(architecturalMap);
-        }
-    });
-}
-
-function showUserStats() {
-    loadUserStats().then(function () {
-        if (!architecturalMap) return;
-
-        const content = `
-            <div style="text-align: center;">
-                <div style="margin: 10px 0;">
-                    <div style="font-size: 24px; color: var(--teal); font-weight: bold;">${window.userStatsData?.total_analyses || 0}</div>
-                    <div style="font-size: 12px;">Всього аналізів</div>
-                </div>
-                <div style="margin: 10px 0;">
-                    <div style="font-size: 18px; color: var(--teal); font-weight: bold;">${window.userStatsData?.favorite_style || '-'}</div>
-                    <div style="font-size: 12px;">Улюблений стиль</div>
-                </div>
-            </div>
-        `;
-
-        L.popup()
-            .setLatLng([46.4825, 30.7233])
-            .setContent(`<div><h4>Статистика</h4>${content}</div>`)
-            .openOn(architecturalMap);
-    });
 }
 
 // Gemini / history / stats blocks
@@ -204,16 +177,16 @@ function updateGeminiBlock(analysisText) {
     let lines = formattedText.split('\n');
     for (let i = 0; i < lines.length; i++) {
         if (lines[i].match(/^\d+\./)) {
-            lines[i] = '<div style="margin: 8px 0; padding-left: 15px;">' + lines[i] + '</div>';
+            lines[i] = '<div class="gemini-line">' + lines[i] + '</div>';
         }
     }
     formattedText = lines.join('<br>');
 
     geminiContent.innerHTML = `
-        <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; border-left: 4px solid var(--teal); font-size: 14px; line-height: 1.6; color: #fff;">
+        <div class="gemini-analysis-box">
             ${formattedText}
         </div>
-        <div style="margin-top: 10px; text-align: center; font-size: 12px; color: rgba(255,255,255,0.6);">
+        <div class="gemini-source">
             Аналіз від Google Gemini Vision
         </div>
     `;
@@ -223,44 +196,20 @@ function updateHistoryBlock(historyData) {
     const historyContent = document.getElementById('historyContent');
     if (!historyContent || !historyData || !historyData.history) return;
 
-    const fallbackSvg =
-        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNmMGYwZjAiLz48dGV4dCB4PSI3NSIgeT0iNzUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIGltYWdlPC90ZXh0Pjwvc3ZnPg==';
-
-    function guessMimeFromBase64(b64) {
-        if (!b64) return 'image/jpeg';
-        if (b64.startsWith('/9j/')) return 'image/jpeg'; // JPEG
-        if (b64.startsWith('iVBOR')) return 'image/png'; // PNG
-        if (b64.startsWith('R0lGOD')) return 'image/gif'; // GIF
-        return 'image/jpeg';
-    }
+    const fallbackImage = '/static/icons/no-image.svg';
 
     function buildThumbnailSrc(item) {
-        const t = (item.image_thumbnail || '').trim();
+        const thumbnail = (item.image_thumbnail || '').trim();
 
-        // 1) вже готовий data URL
-        if (t.startsWith('data:image/')) return t;
-
-        // 2) URL/абсолютний шлях
-        if (t.startsWith('/') || t.startsWith('http://') || t.startsWith('https://')) return t;
-
-        // 3) base64 (намагаємось розпізнати тип)
-        if (t && /^[A-Za-z0-9+/=]+$/.test(t)) {
-        const mime = guessMimeFromBase64(t);
-        return `data:${mime};base64,${t}`;
+        if (thumbnail.startsWith('data:image/')) {
+            return thumbnail;
         }
 
-        // 4) якщо схоже на шлях у dataset (типу "Achaemenid architecture/000092.jpg")
-        const filePath = (item.image_name || '').trim();
-        if (filePath && filePath.includes('/')) {
-        return `/api/dataset/image/${encodeURI(filePath)}`;
-        }
-
-        return fallbackSvg;
+        return fallbackImage;
     }
 
     if (historyData.history.length === 0) {
-        historyContent.innerHTML =
-        '<p style="color: rgba(255,255,255,0.6); text-align: center;">Немає історії аналізів</p>';
+        historyContent.innerHTML = '<p class="empty-state">Немає історії аналізів</p>';
         return;
     }
 
@@ -271,32 +220,34 @@ function updateHistoryBlock(historyData) {
         const date = new Date(item.created_at).toLocaleDateString('uk-UA');
 
         return `
-        <div style="display: flex; gap: 10px; padding: 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; margin-bottom: 10px; background: rgba(0,0,0,0.2);">
-            <img src="${thumbnailSrc}"
-                onerror="this.onerror=null;this.src='${fallbackSvg}'"
-                style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0;"
-                alt="">
-            <div style="flex: 1; min-width: 0; color: #fff;">
-            <div style="font-weight: bold; color: var(--teal); margin-bottom: 4px; font-size: 14px;">
-                ${item.architectural_style || 'Невідомий стиль'}
+            <div class="history-item">
+                <img src="${thumbnailSrc}"
+                    onerror="this.onerror=null;this.src='${fallbackImage}'"
+                    class="history-thumb"
+                    alt="">
+                <div class="history-info">
+                    <div class="history-style">
+                        ${item.architectural_style || 'Невідомий стиль'}
+                    </div>
+                    <div class="history-confidence">
+                        Впевненість: ${confidence}%
+                    </div>
+                    <div class="history-date">
+                        ${date}
+                    </div>
+                </div>
             </div>
-            <div style="color: rgba(255,255,255,0.6); font-size: 12px; margin-bottom: 4px;">
-                Впевненість: ${confidence}%
-            </div>
-            <div style="color: #999; font-size: 11px;">
-                ${date}
-            </div>
-            </div>
-        </div>
         `;
     }).join('');
 
     historyContent.innerHTML = `
-        <div style="max-height: 400px; overflow-y: auto;">
-        ${historyHTML}
+        <div class="history-list">
+            ${historyHTML}
         </div>
-        <div style="text-align: center; margin-top: 10px;">
-        <small style="color: rgba(255,255,255,0.6);">Останні ${Math.min(historyData.history.length, 10)} аналізів</small>
+        <div class="history-footer">
+            <small class="history-footer-text">
+                Останні ${Math.min(historyData.history.length, 10)} аналізів
+            </small>
         </div>
     `;
 }
@@ -326,23 +277,25 @@ async function loadUserStats() {
             if (statsContent) {
                 let favoriteStyle = 'Немає';
                 if (statsData.popular_styles && statsData.popular_styles.length > 0) {
-                    const sorted = statsData.popular_styles.sort(function (a, b) { return b.count - a.count; });
+                    const sorted = [...statsData.popular_styles].sort(function (a, b) {
+                        return b.count - a.count;
+                    });
                     favoriteStyle = sorted[0].style || 'Немає';
                 }
 
                 statsContent.innerHTML = `
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div style="text-align: center; padding: 15px; background: rgba(255, 255, 255, 0.15); border-radius: 8px; backdrop-filter: blur(5px);">
-                            <div style="font-size: 28px; color: var(--teal); font-weight: bold; margin-bottom: 5px;">
+                    <div class="stats-grid">
+                        <div class="stats-card">
+                            <div class="stats-number">
                                 ${statsData.total_analyses || 0}
                             </div>
-                            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.8);">Всього аналізів</div>
+                            <div class="stats-label">Всього аналізів</div>
                         </div>
-                        <div style="text-align: center; padding: 15px; background: rgba(255, 255, 255, 0.15); border-radius: 8px; backdrop-filter: blur(5px);">
-                            <div style="font-size: 16px; color: var(--teal); font-weight: bold; margin-bottom: 5px;">
+                        <div class="stats-card">
+                            <div class="stats-favorite">
                                 ${favoriteStyle}
                             </div>
-                            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.8);">Улюблений стиль</div>
+                            <div class="stats-label">Улюблений стиль</div>
                         </div>
                     </div>
                 `;
@@ -356,4 +309,3 @@ async function loadUserStats() {
 window.register = register;
 window.login = login;
 window.logout = logout;
-window.quickLogin = quickLogin;

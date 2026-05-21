@@ -32,22 +32,14 @@
     <!-- Authentication block -->
     <div class="auth-block" id="authBlock">
         <div class="auth-content">
-            <span class="user-info" id="userInfo" style="display: none;"></span>
             <div class="auth-buttons" id="guestButtons">
                 <button class="auth-btn" id="loginBtn" onclick="openModal('loginModal')">Вхід</button>
                 <button class="auth-btn" id="registerBtn" onclick="openModal('registerModal')">Реєстрація</button>
             </div>
-            <div class="auth-buttons" id="userButtons" style="display: none;">
+            <div class="auth-buttons" id="userButtons">
                 <span class="welcome-text" id="welcomeText"></span>
                 <button class="auth-btn logout-btn" id="logoutBtn" onclick="logout()">Вихід</button>
             </div>
-        </div>
-        <!-- Quick login for testing -->
-        <div class="quick-login" id="quickLogin">
-            <span>Швидкий вхід:</span>
-            <button class="quick-login-btn" onclick="quickLogin('demo', 'demo')">demo</button>
-            <button class="quick-login-btn" onclick="quickLogin('admin', 'admin')">admin</button>
-            <button class="quick-login-btn" onclick="quickLogin('user1', '1234')">user1</button>
         </div>
     </div>
 
@@ -62,13 +54,7 @@
             </div>
 
             <!-- Model selection dropdown -->
-            <select class="model-dropdown" id="modelSelector" onchange="onModelChange()">
-                <optgroup label="Режим аналізу">
-                    <option value="efficientnet_b0" selected>EfficientNet-B0 (74.93%)</option>
-                    <option value="resnet50">ResNet-50 (74.93%)</option>
-                    <option value="ensemble">Ensemble (обидві моделі)</option>
-                </optgroup>
-            </select>
+            <select class="model-dropdown" id="modelSelector" onchange="onModelChange()"></select>
 
             <!-- Model info card -->
             <div class="model-info-card" id="modelInfoCard">
@@ -82,11 +68,11 @@
                 </div>
                 <div class="model-info-row">
                     <span class="model-info-label">Рекомендований batch:</span>
-                    <span class="model-info-value" id="modelBatchSize">64</span>
+                    <span class="model-info-value" id="modelBatchSize">32</span>
                 </div>
                 <div class="model-info-row">
                     <span class="model-info-label">Опис:</span>
-                    <span class="model-info-value" id="modelDescription" style="font-size: 12px; font-weight: normal;">Компактна і швидка модель</span>
+                    <span class="model-info-value" id="modelDescription">Компактна і швидка модель</span>
                 </div>
             </div>
 
@@ -98,12 +84,17 @@
                 <button class="analysis-option-btn" id="btnTTA" onclick="setAnalysisMode('tta')">
                     <img class="ui-icon" src="{{ url_for('static', filename='icons/target.png') }}" alt="" aria-hidden="true">TTA
                 </button>
+                <p class="tta-help">
+                    <strong>ТТА</strong> — режим покращеної точності. Модель детальніше обробляє складні зображення, але це займає більше часу.
+                </p>
             </div>
 
             <!-- Current model indicator -->
             <div class="current-model-indicator">
                 <div class="dot"></div>
-                <span style="font-size: 13px; color: #fff;">Поточна модель: <strong id="currentModelName">EfficientNet-B0</strong></span>
+                <span class="current-model-text">
+                    Поточна модель: <strong id="currentModelName">EfficientNet-B0</strong>
+                </span>
             </div>
         </div>
 
@@ -128,7 +119,7 @@
         </div>
 
         <!-- User blocks for registered users -->
-        <div id="userBlocks" style="display: none; flex-direction: column; gap: 20px; margin-top: 20px;">
+        <div id="userBlocks">
             <!-- Gemini AI block -->
             <div class="user-block" id="geminiBlock">
                 <h3><img class="ui-icon" src="{{ url_for('static', filename='icons/robot.png') }}" alt="" aria-hidden="true">Аналіз Gemini AI</h3>
@@ -157,32 +148,32 @@
             <div class="user-block" id="stylesBlock">
                 <h3><img class="ui-icon" src="{{ url_for('static', filename='icons/temple_front.png') }}" alt="" aria-hidden="true">Підтримувані стилі (25)</h3>
                 <div id="stylesContent">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; max-height: 300px; overflow-y: auto;">
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Ахеменідська архітектура</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Американський ремісничий стиль</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Американська чотирикутна архітектура</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Давньоєгипетська архітектура</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Ар-деко</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Архітектура модерн</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Бароко</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Баухаус</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Боз-Ар</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Візантійська архітектура</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Чиказька школа архітектури</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Колоніальна архітектура</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Деконструктивізм</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Едвардіанська архітектура</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Георгіанська архітектура</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Готика</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Грецьке відродження</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Інтернаціональний стиль</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Новаторська архітектура</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Палладіанська архітектура</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Постмодернізм</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Архітектура королеви Анни</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Романський стиль</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Російське відродження</div>
-                        <div style="padding: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 14px; border-left: 3px solid var(--steel-blue);">Тюдорівське відродження</div>
+                    <div class="styles-grid">
+                        <div class="style-chip">Ахеменідська архітектура</div>
+                        <div class="style-chip">Американський ремісничий стиль</div>
+                        <div class="style-chip">Американська чотирикутна архітектура</div>
+                        <div class="style-chip">Давньоєгипетська архітектура</div>
+                        <div class="style-chip">Ар-деко</div>
+                        <div class="style-chip">Архітектура модерн</div>
+                        <div class="style-chip">Бароко</div>
+                        <div class="style-chip">Баухаус</div>
+                        <div class="style-chip">Боз-Ар</div>
+                        <div class="style-chip">Візантійська архітектура</div>
+                        <div class="style-chip">Чиказька школа архітектури</div>
+                        <div class="style-chip">Колоніальна архітектура</div>
+                        <div class="style-chip">Деконструктивізм</div>
+                        <div class="style-chip">Едвардіанська архітектура</div>
+                        <div class="style-chip">Георгіанська архітектура</div>
+                        <div class="style-chip">Готика</div>
+                        <div class="style-chip">Грецьке відродження</div>
+                        <div class="style-chip">Інтернаціональний стиль</div>
+                        <div class="style-chip">Новаторська архітектура</div>
+                        <div class="style-chip">Палладіанська архітектура</div>
+                        <div class="style-chip">Постмодернізм</div>
+                        <div class="style-chip">Архітектура королеви Анни</div>
+                        <div class="style-chip">Романський стиль</div>
+                        <div class="style-chip">Неовізантійське відродження</div>
+                        <div class="style-chip">Тюдорівське відродження</div>
                     </div>
                 </div>
             </div>
@@ -193,7 +184,7 @@
         <div class="map-block glass-card">
             <h2><img class="ui-icon-lg" src="{{ url_for('static', filename='icons/map.png') }}" alt="" aria-hidden="true">Архітектурна карта</h2>
             <div id="mapContainer">
-                <div id="architecturalMap" style="height: 500px; width: 100%; border-radius: 15px; overflow: hidden;"></div>
+                <div id="architecturalMap"></div>
             </div>
         </div>
     </div>

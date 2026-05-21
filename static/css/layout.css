@@ -60,11 +60,6 @@
     margin-bottom: 15px;
 }
 
-.logo-icon {
-    font-size: 50px;
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
-}
-
 .logo-icon-img {
   width: 34px;
   height: 34px;
@@ -103,6 +98,40 @@
     opacity: 0.9;
     letter-spacing: 3px;
     text-transform: uppercase;
+}
+
+.app-toast {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 520px;
+    width: calc(100% - 32px);
+    padding: 16px 20px;
+    border-radius: 16px;
+    color: #fff;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+    z-index: 10000;
+    font-size: 15px;
+    line-height: 1.45;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    opacity: 1;
+    transition: opacity 0.25s ease;
+}
+
+.app-toast-success {
+    background: rgba(35, 65, 60, 0.96);
+    border: 1px solid rgba(55, 150, 131, 0.9);
+}
+
+.app-toast-error {
+    background: rgba(80, 35, 35, 0.96);
+    border: 1px solid rgba(255, 120, 120, 0.7);
+}
+
+.app-toast.hidden {
+    opacity: 0;
 }
 
 /* Main layout */

@@ -52,12 +52,6 @@ def init_db(base_dir: Path | None = None) -> None:
         """
     )
 
-    # якщо таблиця стара і колонки ще нема
-    cur.execute("PRAGMA table_info(query_history)")
-    columns = [c[1] for c in cur.fetchall()]
-    if "image_thumbnail" not in columns:
-        cur.execute("ALTER TABLE query_history ADD COLUMN image_thumbnail TEXT")
-
     # Architectural preferences
     cur.execute(
         """
@@ -104,7 +98,7 @@ def create_user(username: str, password: str, base_dir: Path | None = None) -> T
     cur.execute("SELECT id FROM users WHERE username = ?", (username,))
     if cur.fetchone():
         conn.close()
-        return False, "User already exists"
+        return False, "Користувач уже існує"
 
     salt = secrets.token_bytes(32)
     pwd_hash = hash_password(password, salt)
@@ -115,7 +109,7 @@ def create_user(username: str, password: str, base_dir: Path | None = None) -> T
     )
     conn.commit()
     conn.close()
-    return True, "Registration successful"
+    return True, "Реєстрація успішна"
 
 
 def authenticate_user(username: str, password: str, base_dir: Path | None = None) -> Optional[Dict[str, Any]]:
@@ -147,7 +141,7 @@ def save_query_history(
     confidence: float,
     ai_analysis: str,
     base_dir: Path | None = None,
-) -> None:
+) -> int:
     conn = get_connection(base_dir)
     cur = conn.cursor()
 
@@ -160,7 +154,8 @@ def save_query_history(
         (user_id, image_name, image_thumbnail, architectural_style, confidence, ai_analysis),
     )
 
-    # Оновлення таблиці preference
+    history_id = int(cur.lastrowid)
+
     cur.execute(
         "SELECT id, preference_score FROM architectural_preferences WHERE user_id = ? AND style_name = ?",
         (user_id, architectural_style),
@@ -187,6 +182,33 @@ def save_query_history(
 
     conn.commit()
     conn.close()
+
+    return history_id
+
+def update_query_history_ai_analysis(
+    user_id: int,
+    history_id: int,
+    ai_analysis: str,
+    base_dir: Path | None = None,
+) -> bool:
+    conn = get_connection(base_dir)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE query_history
+        SET ai_analysis = ?
+        WHERE id = ? AND user_id = ?
+        """,
+        (ai_analysis, history_id, user_id),
+    )
+
+    updated = cur.rowcount > 0
+
+    conn.commit()
+    conn.close()
+
+    return updated
 
 
 def get_user_history(user_id: int, base_dir: Path | None = None, limit: int = 20) -> List[Dict[str, Any]]:
@@ -227,7 +249,7 @@ def get_user_stats(user_id: int, base_dir: Path | None = None) -> Dict[str, Any]
         """,
         (user_id,),
     )
-    favorite_styles = [dict(r) for r in cur.fetchall()]
+    rows = [dict(r) for r in cur.fetchall()]
 
     cur.execute(
         """
@@ -240,17 +262,18 @@ def get_user_stats(user_id: int, base_dir: Path | None = None) -> Dict[str, Any]
     avg_conf = cur.fetchone()["avg_confidence"] or 0
 
     conn.close()
-    
+
     popular_styles = [
         {"style": r["architectural_style"], "count": r["count"]}
-        for r in favorite_styles
+        for r in rows
         if r.get("architectural_style")
     ]
 
     return {
         "total_analyses": total,
         "popular_styles": popular_styles,
-        "favorite_style": round(float(avg_conf), 3) if avg_conf else 0.0,
+        "favorite_style": popular_styles[0]["style"] if popular_styles else None,
+        "avg_confidence": round(float(avg_conf), 3) if avg_conf else 0.0,
     }
 
 
