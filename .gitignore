@@ -7,7 +7,6 @@ __pycache__/
 # Віртуальне оточення
 .venv/
 venv/
-!.env.example
 
 # Flask / runtime
 sessions/
@@ -16,7 +15,6 @@ archvision.db
 
 # Env
 .env
-.env.*
 
 # IDE
 .vs/
@@ -31,3 +29,4 @@ dataset/
 checkpoints/
 training_runs/
 data/*.pth
+test_results/
