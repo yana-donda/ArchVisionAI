@@ -344,7 +344,7 @@ def model_info(model_type: str):
 # Dataset background images
 @bp.route("/api/dataset/images")
 def dataset_images():
-    return jsonify({"images": _service().get_dataset_images(limit=20)})
+    return jsonify({"images": _service().get_dataset_images(limit=30)})
 
 
 @bp.route("/api/dataset/image/<path:filepath>")

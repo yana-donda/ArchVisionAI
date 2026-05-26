@@ -171,7 +171,7 @@ class AnalysisService:
     # ------------------------------
     # Dataset images for background
     # ------------------------------
-    def get_dataset_images(self, limit: int = 20) -> List[str]:
+    def get_dataset_images(self, limit: int = 30) -> List[str]:
         dataset_dir = self.base_dir / "dataset"
         image_extensions = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
