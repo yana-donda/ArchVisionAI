@@ -27,6 +27,4 @@ Thumbs.db
 *.pth
 dataset/
 checkpoints/
-training_runs/
 data/*.pth
-test_results/

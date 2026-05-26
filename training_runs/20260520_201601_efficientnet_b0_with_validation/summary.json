@@ -1,0 +1,21 @@
+{
+  "model_key": "efficientnet_b0",
+  "model_name": "EfficientNet-B0",
+  "timm_name": "efficientnet_b0",
+  "epochs": 20,
+  "batch_size": 24,
+  "lr": 0.0001,
+  "weight_decay": 0.0001,
+  "device": "cuda",
+  "train_dataset": "D:\\ArchVisionAI\\dataset\\train",
+  "validation_dataset": "D:\\ArchVisionAI\\dataset\\test",
+  "validation_used": true,
+  "best_metric": "val_acc",
+  "best_epoch": 16,
+  "best_val_acc": 89.129,
+  "best_val_loss": 1.01803,
+  "log_file": "D:\\ArchVisionAI\\training_runs\\20260520_201601_efficientnet_b0\\train.log",
+  "metrics_csv": "D:\\ArchVisionAI\\training_runs\\20260520_201601_efficientnet_b0\\metrics.csv",
+  "best_checkpoint": "D:\\ArchVisionAI\\checkpoints\\efficientnet_b0_best.pth",
+  "last_checkpoint": "D:\\ArchVisionAI\\checkpoints\\efficientnet_b0_last.pth"
+}

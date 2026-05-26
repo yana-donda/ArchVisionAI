@@ -1,0 +1,21 @@
+{
+  "model_key": "resnet50",
+  "model_name": "ResNet-50",
+  "timm_name": "resnet50",
+  "epochs": 30,
+  "batch_size": 32,
+  "lr": 0.0001,
+  "weight_decay": 0.0001,
+  "device": "cuda",
+  "train_dataset": "D:\\ArchVisionAI\\dataset\\train",
+  "validation_dataset": "D:\\ArchVisionAI\\dataset\\test",
+  "validation_used": true,
+  "best_metric": "val_acc",
+  "best_epoch": 22,
+  "best_val_acc": 89.4565,
+  "best_val_loss": 0.969502,
+  "log_file": "D:\\ArchVisionAI\\training_runs\\20260520_205855_resnet50\\train.log",
+  "metrics_csv": "D:\\ArchVisionAI\\training_runs\\20260520_205855_resnet50\\metrics.csv",
+  "best_checkpoint": "D:\\ArchVisionAI\\checkpoints\\resnet50_best.pth",
+  "last_checkpoint": "D:\\ArchVisionAI\\checkpoints\\resnet50_last.pth"
+}
