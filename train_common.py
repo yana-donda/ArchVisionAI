@@ -125,7 +125,7 @@ def build_loaders(
         raise FileNotFoundError(f"Не знайдено train-датасет: {train_dir}")
 
     if not val_dir.exists():
-        raise FileNotFoundError(f"Не знайдено validation/test-датасет: {val_dir}")
+        raise FileNotFoundError(f"Не знайдено validation-датасет: {val_dir}")
 
     train_dataset = ImageFolder(str(train_dir), transform=build_train_transform(input_size))
     val_dataset = ImageFolder(str(val_dir), transform=build_val_transform(input_size))
@@ -134,7 +134,7 @@ def build_loaders(
         raise ValueError("У train-датасеті замало зображень. Мінімум 2.")
 
     if len(val_dataset) < 1:
-        raise ValueError("У validation/test-датасеті немає зображень.")
+        raise ValueError("У validation-датасеті немає зображень.")
 
     if len(train_dataset.classes) < 2:
         raise ValueError("Для класифікації потрібно щонайменше 2 класи.")
@@ -147,14 +147,14 @@ def build_loaders(
         extra_in_val = sorted(val_classes - train_classes)
 
         raise ValueError(
-            "Класи у train і validation/test не збігаються. "
-            f"Немає у validation/test: {missing_in_val}. "
-            f"Зайві у validation/test: {extra_in_val}."
+            "Класи у train і validation не збігаються. "
+            f"Немає у validation: {missing_in_val}. "
+            f"Зайві у validation: {extra_in_val}."
         )
 
     if train_dataset.class_to_idx != val_dataset.class_to_idx:
         raise ValueError(
-            "class_to_idx у train і validation/test не збігається. "
+            "class_to_idx у train і validation не збігається. "
             "Перевір назви папок класів."
         )
 
@@ -352,8 +352,8 @@ def run_training(
     )
     parser.add_argument(
         "--val-dir",
-        default="dataset/test",
-        help="Папка з validation/test-зображеннями у форматі ImageFolder.",
+        default="dataset/val",
+        help="Папка з validation-зображеннями у форматі ImageFolder.",
     )
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--batch-size", type=int, default=default_batch_size)
