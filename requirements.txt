@@ -11,3 +11,5 @@ google-genai
 python-dotenv
 matplotlib
 gunicorn
+pytest
+requests

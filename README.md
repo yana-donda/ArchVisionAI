@@ -564,6 +564,83 @@ http://localhost
 
 Найкращу якість класифікації показав режим **Ensemble + TTA**.
 
+## Автоматизоване тестування застосунку
+
+У проєкті реалізовано автоматизовані тести для перевірки серверної частини, API-маршрутів, інтеграції моделей комп’ютерного зору, Gemini API та розгорнутого вебзастосунку.
+
+### Встановлення залежностей
+
+Перед запуском тестів потрібно встановити залежності з файлу `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
+
+### Локальні інтеграційні тести
+
+Локальні інтеграційні тести перевіряють роботу Flask-застосунку, автентифікації, захищених маршрутів, API моделей, аналізу зображень, збереження історії, статистики та архітектурних вподобань користувача.
+
+Запуск локальних тестів:
+
+```bash
+python -m pytest -q tests/test_app.py
+```
+
+Ці тести використовують реальні компоненти застосунку: `AnalysisService`, `ArchVisionAnalyzer`, SQLite-базу даних і checkpoint-файли моделей. Для їх виконання потрібні такі файли:
+
+```text
+data/class_mapping.json
+checkpoints/efficientnet_b0_best.pth
+checkpoints/resnet50_best.pth
+```
+
+Окремо можна запустити тест інтеграції з Gemini API. Для цього потрібно задати ключ Gemini у змінній середовища:
+
+```powershell
+$env:GEMINI_API_KEY_1="your_gemini_api_key"
+python -m pytest -q tests/test_app.py -k gemini
+```
+
+Якщо Gemini повертає непорожню відповідь, тест вважається успішним.
+
+### Тести розгорнутого застосунку
+
+Окремо реалізовано тести для перевірки розгорнутої версії застосунку через HTTP-запити. Вони перевіряють доступність головної сторінки, статичних ресурсів, повторювані запити, автентифікацію, аналіз зображень у різних режимах, історію користувача та одночасну роботу кількох користувачів.
+
+Перед запуском потрібно вказати адресу розгорнутого застосунку:
+
+```powershell
+$env:ARCHVISION_BASE_URL="http://archvisionai.swedencentral.cloudapp.azure.com/"
+```
+
+Запуск deployment/load тестів без Gemini:
+
+```powershell
+python -m pytest -q tests/test_deployed_load.py -m "deployed and not gemini" -s
+```
+
+Кількість одночасних користувачів можна змінити через змінну середовища:
+
+```powershell
+$env:ARCHVISION_LOAD_USERS="5"
+python -m pytest -q tests/test_deployed_load.py -m "deployed and not gemini" -s
+```
+
+Для запуску Gemini-тесту на розгорнутому застосунку потрібно додатково ввімкнути відповідний прапорець:
+
+```powershell
+$env:RUN_DEPLOYED_GEMINI_TEST="1"
+python -m pytest -q tests/test_deployed_load.py -m gemini -s
+```
+
+Після запуску deployment/load тестів створюється файл:
+
+```text
+test_results/deployed_load_results.csv
+```
+
+У ньому зберігаються сценарій тесту, HTTP-статус, час відповіді, використаний режим моделі та результат виконання.
+
 ## Безпека
 
 У застосунку реалізовано базові механізми безпеки:
