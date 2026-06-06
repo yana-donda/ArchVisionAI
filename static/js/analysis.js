@@ -245,6 +245,13 @@ async function analyzeImage() {
 
         displayResults(data);
 
+        const normalizedResult = data.data || data;
+
+        if (normalizedResult.is_architecture === false) {
+            if (analyzeBtn) analyzeBtn.disabled = false;
+            return;
+        }
+
         if (typeof loadUserHistory === 'function' && isAuthenticatedUser()) {
             loadUserHistory();
         }
@@ -281,6 +288,30 @@ function displayResults(data) {
     let confidence = 0;
 
     const result = data.data || data;
+
+    if (result.is_architecture === false) {
+        const message = result.message || 'Здається, на зображенні немає архітектурного об’єкта. Завантажте фото будівлі або архітектурної споруди.';
+        const check = result.architecture_check || {};
+        const confidence = check.confidence ? Math.round(check.confidence * 100) : null;
+
+        let warningHtml = `
+            <div class="result-card warning-card">
+                <h3>Зображення не підходить для архітектурного аналізу</h3>
+                <p>${message}</p>
+        `;
+
+        if (confidence !== null) {
+            warningHtml += `<p><strong>Впевненість перевірки:</strong> ${confidence}%</p>`;
+        }
+
+        warningHtml += `</div>`;
+
+        if (results) {
+            results.innerHTML = warningHtml;
+        }
+
+        return;
+    }
 
     if (result.architectural_style) {
         const style = result.architectural_style;

@@ -13,12 +13,14 @@ from flask import Request
 
 from ml_engine import ArchVisionAnalyzer
 from model_zoo import MODEL_CONFIGS, ModelType
+from services.architecture_filter import ArchitectureFilter
 
 
 class AnalysisService:
     def __init__(self, base_dir: Optional[Path] = None):
         self.base_dir = Path(base_dir or Path(__file__).resolve().parent.parent)
         self.analyzer = ArchVisionAnalyzer(self.base_dir)
+        self.architecture_filter = ArchitectureFilter(self.base_dir)
         self.current_mode = "efficientnet_b0"
 
     # ------------------------------
@@ -134,11 +136,68 @@ class AnalysisService:
         include_gemini: bool = False,
     ) -> Dict[str, Any]:
         image, json_data, image_name = self._read_image_from_request(request)
-        use_tta = bool(json_data.get("use_tta", False))
 
-        model_type = json_data.get("model_type") or mode_override or self.current_mode
+        form_data = request.form if request.form else {}
+
+        use_tta = bool(
+            json_data.get("use_tta", False)
+            or str(form_data.get("use_tta", "")).lower() in {"1", "true", "yes", "on"}
+        )
+
+        model_type = (
+            json_data.get("model_type")
+            or form_data.get("model_type")
+            or mode_override
+            or self.current_mode
+        )
+
         if model_type not in {"efficientnet_b0", "resnet50", "ensemble"}:
             model_type = self.current_mode
+
+        architecture_check = self.architecture_filter.predict(image)
+
+        if (
+            architecture_check.get("checked")
+            and architecture_check.get("is_architecture") is False
+        ):
+            result = {
+                "is_architecture": False,
+                "skip_history": True,
+                "message": (
+                    "Здається, на зображенні немає архітектурного об'єкта. "
+                    "Завантажте фото будівлі, фасаду або архітектурної споруди."
+                ),
+                "architecture_check": architecture_check,
+                "architectural_style": {
+                    "top_prediction": {
+                        "style": "not_architecture",
+                        "style_uk": "Не архітектурне зображення",
+                        "confidence": architecture_check.get("confidence", 0.0),
+                    },
+                    "all_predictions": [],
+                    "geographical_data": {
+                        "regions": [],
+                        "famous_buildings": [],
+                    },
+                    "model": "Architecture binary filter",
+                    "total_styles": len(self.analyzer.architectural_styles),
+                },
+                "supported_styles": self.analyzer.architectural_styles,
+                "style_mapping": self.analyzer.style_mapping,
+                "geographical_data": {
+                    "regions": [],
+                    "famous_buildings": [],
+                },
+            }
+
+            result["_meta"] = {
+                "image_name": image_name,
+                "image_thumbnail": self._make_thumbnail_data_url(image),
+                "use_tta": use_tta,
+                "model_type": "architecture_filter",
+            }
+
+            return result
 
         result = self._run_async(
             self.analyzer.analyze_full(
@@ -149,12 +208,16 @@ class AnalysisService:
             )
         )
 
+        result["is_architecture"] = True
+        result["architecture_check"] = architecture_check
+
         result["_meta"] = {
             "image_name": image_name,
             "image_thumbnail": self._make_thumbnail_data_url(image),
             "use_tta": use_tta,
             "model_type": model_type,
         }
+
         return result
     
     def analyze_gemini_request(self, request: Request) -> Dict[str, Any]:
