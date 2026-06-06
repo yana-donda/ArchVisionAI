@@ -26,24 +26,72 @@ RESULTS_FILE = RESULTS_DIR / "deployed_load_results.csv"
 
 
 def require_base_url() -> str:
-    if not BASE_URL:
+    base_url = os.getenv("ARCHVISION_BASE_URL", BASE_URL).rstrip("/")
+
+    if not base_url:
         pytest.fail(
             "ARCHVISION_BASE_URL is not set. "
             "Set it to the deployed Azure application URL."
         )
-    return BASE_URL
+
+    return base_url
 
 
 def create_test_image_bytes() -> bytes:
-    image = Image.new("RGB", (224, 224), color=(180, 180, 180))
-    buffer = io.BytesIO()
-    image.save(buffer, format="JPEG")
-    return buffer.getvalue()
+    """
+    Reads a real architecture image for deployed integration/load tests.
+
+    After adding the architecture/not_architecture filter, a generated gray square
+    may be correctly rejected as not_architecture and will not be saved to history.
+    Therefore deployed tests should send a real building image.
+
+    By default the helper searches in the local dataset/ folder. A custom folder can
+    be provided through ARCHVISION_TEST_IMAGE_DIR.
+    """
+    image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+    dataset_dir = Path(os.getenv("ARCHVISION_TEST_IMAGE_DIR", "dataset"))
+
+    if not dataset_dir.exists():
+        pytest.fail(
+            "No local test image folder found. "
+            "Put at least one architecture image into dataset/ or set ARCHVISION_TEST_IMAGE_DIR."
+        )
+
+    for image_path in sorted(dataset_dir.rglob("*")):
+        if not image_path.is_file():
+            continue
+
+        if image_path.suffix.lower() not in image_extensions:
+            continue
+
+        if "not_architecture" in {part.lower() for part in image_path.parts}:
+            continue
+
+        try:
+            with Image.open(image_path) as image:
+                image.verify()
+        except Exception:
+            continue
+
+        return image_path.read_bytes()
+
+    pytest.fail(
+        "No valid architecture image found for deployed tests. "
+        "Put at least one building/facade image into dataset/."
+    )
 
 
 def image_to_base64_data_url(image_bytes: bytes) -> str:
     encoded = base64.b64encode(image_bytes).decode("utf-8")
     return f"data:image/jpeg;base64,{encoded}"
+
+
+def assert_architecture_image_was_accepted(data: dict) -> None:
+    if data.get("is_architecture") is False:
+        pytest.fail(
+            "The deployed application classified the test image as not_architecture. "
+            f"Use a clearer building/facade image in dataset/. Response: {data}"
+        )
 
 
 def measure_request(method: str, url: str, **kwargs) -> tuple[requests.Response, float]:
@@ -223,6 +271,7 @@ def test_deployed_repeated_page_auth_and_analysis_requests():
         data = analyze_response.json()
 
         assert "error" not in data
+        assert_architecture_image_was_accepted(data)
         assert "architectural_style" in data
         assert "top_prediction" in data["architectural_style"]
 
@@ -295,6 +344,10 @@ def run_concurrent_user_scenario(user_index: int) -> dict:
     assert analyze_response.status_code == 200, analyze_response.text
     assert analyze_response.status_code < 500
 
+    analyze_data = analyze_response.json()
+    assert "error" not in analyze_data
+    assert_architecture_image_was_accepted(analyze_data)
+
     history_response, _ = measure_session_request(
         session,
         "GET",
@@ -362,11 +415,11 @@ def test_deployed_gemini_returns_response():
 
     image_bytes = create_test_image_bytes()
 
-    response, duration = measure_request(
+    response, duration = measure_session_request(
+        session,
         "POST",
         f"{base_url}/api/analyze/gemini",
         files={"file": ("gemini_deployed.jpg", io.BytesIO(image_bytes), "image/jpeg")},
-        cookies=session.cookies,
     )
 
     assert response.status_code == 200, response.text

@@ -21,20 +21,43 @@ load_dotenv()
 def real_base_dir(tmp_path: Path) -> Path:
     project_dir = Path(__file__).resolve().parents[1]
 
-    data_dir = project_dir / "data"
-    checkpoints_dir = project_dir / "checkpoints"
-    dataset_dir = project_dir / "dataset"
+    source_data_dir = project_dir / "data"
+    source_checkpoints_dir = project_dir / "checkpoints"
+    source_dataset_dir = project_dir / "dataset"
 
-    if not (data_dir / "class_mapping.json").exists():
-        pytest.fail(f"Missing required file: {data_dir / 'class_mapping.json'}")
+    target_data_dir = tmp_path / "data"
+    target_checkpoints_dir = tmp_path / "checkpoints"
+    target_dataset_dir = tmp_path / "dataset"
 
-    shutil.copytree(data_dir, tmp_path / "data", dirs_exist_ok=True)
+    if not source_data_dir.exists():
+        pytest.fail(f"Missing data folder: {source_data_dir}")
 
-    if checkpoints_dir.exists():
-        shutil.copytree(checkpoints_dir, tmp_path / "checkpoints", dirs_exist_ok=True)
+    if not (source_data_dir / "class_mapping.json").exists():
+        pytest.fail(
+            f"Missing required file: {source_data_dir / 'class_mapping.json'}"
+        )
 
-    if dataset_dir.exists():
-        shutil.copytree(dataset_dir, tmp_path / "dataset", dirs_exist_ok=True)
+    shutil.copytree(source_data_dir, target_data_dir, dirs_exist_ok=True)
+
+    if source_checkpoints_dir.exists():
+        shutil.copytree(
+            source_checkpoints_dir,
+            target_checkpoints_dir,
+            dirs_exist_ok=True,
+        )
+
+    if source_dataset_dir.exists():
+        shutil.copytree(
+            source_dataset_dir,
+            target_dataset_dir,
+            dirs_exist_ok=True,
+        )
+
+    if not (target_data_dir / "class_mapping.json").exists():
+        pytest.fail(
+            f"class_mapping.json was not copied to test folder: "
+            f"{target_data_dir / 'class_mapping.json'}"
+        )
 
     return tmp_path
 
@@ -78,6 +101,61 @@ def create_test_image_bytes(
     size: tuple[int, int] = (224, 224),
     image_format: str = "JPEG",
 ) -> bytes:
+    image = Image.new("RGB", size, color=(180, 180, 180))
+    buffer = io.BytesIO()
+    image.save(buffer, format=image_format)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def read_sample_architecture_image_bytes(base_dir: Path) -> bytes:
+    """
+    Reads a real architecture image for tests.
+
+    The project demo dataset may be either:
+    1. flat: dataset/*.jpg
+    2. structured: dataset/train/architecture or dataset/val/architecture
+
+    The helper first tries structured folders, then falls back to any image
+    inside dataset, except folders named not_architecture.
+    """
+    image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+    preferred_dirs = [
+        base_dir / "dataset" / "val" / "architecture",
+        base_dir / "dataset" / "train" / "architecture",
+        base_dir / "dataset",
+    ]
+
+    for directory in preferred_dirs:
+        if not directory.exists():
+            continue
+
+        for image_path in sorted(directory.rglob("*")):
+            if not image_path.is_file():
+                continue
+
+            if image_path.suffix.lower() not in image_extensions:
+                continue
+
+            if "not_architecture" in {part.lower() for part in image_path.parts}:
+                continue
+
+            return image_path.read_bytes()
+
+    pytest.fail(
+        "No architecture test image found. "
+        "Put at least one building image into dataset/."
+    )
+
+
+def create_not_architecture_image_bytes(
+    size: tuple[int, int] = (224, 224),
+    image_format: str = "JPEG",
+) -> bytes:
+    """
+    Creates a simple non-architecture image for testing the binary filter.
+    """
     image = Image.new("RGB", size, color=(180, 180, 180))
     buffer = io.BytesIO()
     image.save(buffer, format=image_format)
@@ -276,7 +354,7 @@ def test_real_analyze_returns_413_for_real_large_request(client):
 def test_real_analyze_file_upload_with_efficientnet(client, real_base_dir: Path):
     assert_real_model_ready(real_base_dir, "efficientnet_b0")
 
-    image_bytes = create_test_image_bytes()
+    image_bytes = read_sample_architecture_image_bytes(real_base_dir)
 
     response = client.post(
         "/api/analyze",
@@ -292,6 +370,7 @@ def test_real_analyze_file_upload_with_efficientnet(client, real_base_dir: Path)
     data = response.get_json()
 
     assert "error" not in data
+    assert data.get("is_architecture") is True
     assert "architectural_style" in data
     assert "supported_styles" in data
     assert "geographical_data" in data
@@ -303,10 +382,34 @@ def test_real_analyze_file_upload_with_efficientnet(client, real_base_dir: Path)
     assert 0 <= top_prediction["confidence"] <= 1
 
 
+def test_real_analyze_rejects_not_architecture_image(client):
+    image_bytes = create_not_architecture_image_bytes()
+
+    response = client.post(
+        "/api/analyze",
+        data={
+            "file": (io.BytesIO(image_bytes), "not_architecture_sample.jpg"),
+            "model_type": "efficientnet_b0",
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+
+    data = response.get_json()
+
+    assert "error" not in data
+    assert data["is_architecture"] is False
+    assert data["skip_history"] is True
+    assert "architecture_check" in data
+    assert data["architectural_style"]["model"] == "Architecture binary filter"
+    assert data["architectural_style"]["top_prediction"]["style"] == "not_architecture"
+
+
 def test_real_analyze_base64_image_with_efficientnet(client, real_base_dir: Path):
     assert_real_model_ready(real_base_dir, "efficientnet_b0")
 
-    image_bytes = create_test_image_bytes()
+    image_bytes = read_sample_architecture_image_bytes(real_base_dir)
     image_data = image_to_base64_data_url(image_bytes)
 
     response = client.post(
@@ -323,6 +426,7 @@ def test_real_analyze_base64_image_with_efficientnet(client, real_base_dir: Path
     data = response.get_json()
 
     assert "error" not in data
+    assert data.get("is_architecture") is True
     assert data["architectural_style"]["model"] == "EfficientNet-B0"
     assert len(data["architectural_style"]["all_predictions"]) > 0
 
@@ -330,7 +434,7 @@ def test_real_analyze_base64_image_with_efficientnet(client, real_base_dir: Path
 def test_real_analyze_with_tta(client, real_base_dir: Path):
     assert_real_model_ready(real_base_dir, "efficientnet_b0")
 
-    image_bytes = create_test_image_bytes()
+    image_bytes = read_sample_architecture_image_bytes(real_base_dir)
     image_data = image_to_base64_data_url(image_bytes)
 
     response = client.post(
@@ -347,6 +451,7 @@ def test_real_analyze_with_tta(client, real_base_dir: Path):
     data = response.get_json()
 
     assert "error" not in data
+    assert data.get("is_architecture") is True
     assert data["architectural_style"]["tta_augmentations"] == 5
     assert "TTA" in data["architectural_style"]["model"]
 
@@ -354,7 +459,7 @@ def test_real_analyze_with_tta(client, real_base_dir: Path):
 def test_real_analyze_with_resnet50(client, real_base_dir: Path):
     assert_real_model_ready(real_base_dir, "resnet50")
 
-    image_bytes = create_test_image_bytes()
+    image_bytes = read_sample_architecture_image_bytes(real_base_dir)
     image_data = image_to_base64_data_url(image_bytes)
 
     response = client.post(
@@ -370,6 +475,7 @@ def test_real_analyze_with_resnet50(client, real_base_dir: Path):
     data = response.get_json()
 
     assert "error" not in data
+    assert data.get("is_architecture") is True
     assert data["architectural_style"]["model"] == "ResNet-50"
 
 
@@ -377,7 +483,7 @@ def test_real_analyze_with_ensemble(client, real_base_dir: Path):
     assert_real_model_ready(real_base_dir, "efficientnet_b0")
     assert_real_model_ready(real_base_dir, "resnet50")
 
-    image_bytes = create_test_image_bytes()
+    image_bytes = read_sample_architecture_image_bytes(real_base_dir)
     image_data = image_to_base64_data_url(image_bytes)
 
     response = client.post(
@@ -393,6 +499,7 @@ def test_real_analyze_with_ensemble(client, real_base_dir: Path):
     data = response.get_json()
 
     assert "error" not in data
+    assert data.get("is_architecture") is True
     assert data["architectural_style"]["model"] == "Ensemble (EfficientNet-B0 + ResNet-50)"
 
 
@@ -404,7 +511,7 @@ def test_real_logged_in_analyze_saves_history_stats_and_preferences(
 
     user = register_and_login(client, username="historyuser", password="Password123")
 
-    image_bytes = create_test_image_bytes()
+    image_bytes = read_sample_architecture_image_bytes(real_base_dir)
 
     analyze_response = client.post(
         "/api/analyze",
@@ -457,7 +564,7 @@ def test_real_logged_in_analyze_saves_history_stats_and_preferences(
 def test_real_anonymous_analyze_does_not_save_history(client, real_base_dir: Path):
     assert_real_model_ready(real_base_dir, "efficientnet_b0")
 
-    image_bytes = create_test_image_bytes()
+    image_bytes = read_sample_architecture_image_bytes(real_base_dir)
 
     response = client.post(
         "/api/analyze",
@@ -487,7 +594,7 @@ def test_real_gemini_analysis_returns_response(client, real_base_dir: Path):
 
     register_and_login(client, username="geminiuser", password="Password123")
 
-    image_bytes = create_test_image_bytes()
+    image_bytes = read_sample_architecture_image_bytes(real_base_dir)
 
     response = client.post(
         "/api/analyze/gemini",

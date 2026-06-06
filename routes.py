@@ -177,7 +177,11 @@ def analyze():
 
         result = service.analyze_request(request, include_gemini=False)
 
-        if "user_id" in session and not result.get("error"):
+        if (
+            "user_id" in session
+            and not result.get("error")
+            and not result.get("skip_history")
+        ):
             meta = result.get("_meta", {})
             style_data = result.get("architectural_style", {})
             top_pred = style_data.get("top_prediction", {})
