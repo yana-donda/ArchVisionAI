@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import pathlib
 from typing import Any, Dict, Optional
 
 import torch
@@ -62,6 +63,7 @@ class ArchitectureFilter:
             return
 
         try:
+            pathlib.WindowsPath = pathlib.PosixPath
             checkpoint = torch.load(
                 self.checkpoint_path,
                 map_location=self.device,
